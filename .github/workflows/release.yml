@@ -63,7 +63,7 @@ jobs:
         with:
           cuda: "13.2.2"
           method: network
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]'
+          sub-packages: '["nvcc", "crt", "nvvm", "cudart", "cublas", "cublas_dev", "thrust", "visual_studio_integration"]'
       - name: Register CUDA with Visual Studio's MSBuild
         if: matrix.features == 'cuda'
         shell: pwsh
@@ -77,14 +77,18 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
       - name: Prepare sidecars and runtime libraries
+        env:
+          # Cross-building Intel from Apple Silicon: keep the arm64 Homebrew OpenSSL out of llama.cpp's link.
+          CMAKE_DISABLE_FIND_PACKAGE_OpenSSL: ${{ matrix.target && 'TRUE' || '' }}
         run: node scripts/prepare-bundle.mjs --features "${{ matrix.features }}" ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
       - name: Build installers
         uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CMAKE_DISABLE_FIND_PACKAGE_OpenSSL: ${{ matrix.target && 'TRUE' || '' }}
         # To sign and notarize macOS builds, add APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
         # APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID as repository secrets
         # and pass them through here (tauri-action treats an empty value as a broken certificate).
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Hark ${{ github.ref_name }}"

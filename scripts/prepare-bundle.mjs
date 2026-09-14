@@ -84,10 +84,18 @@ execFileSync("cargo", ["build", "-p", "hark-llm", ...profileArgs, ...featArgs, .
 const libExt = win ? ".dll" : mac ? ".dylib" : ".so";
 let n = 0;
 for (const f of readdirSync(targetDir)) {
-  if (f.endsWith(libExt) && !f.startsWith("hark_lib")) {
-    copyFileSync(path.join(targetDir, f), path.join(resDir, f));
-    n++;
+  if (!f.includes(libExt) || f.startsWith("hark_lib") || f.startsWith("libhark_lib")) continue;
+  const src = path.join(targetDir, f);
+  // macOS ships versioned dylib symlink chains; copy the real file under each name and skip dangling links.
+  let real;
+  try {
+    real = statSync(src).isFile() ? src : null;
+  } catch {
+    real = null;
   }
+  if (!real) continue;
+  copyFileSync(real, path.join(resDir, f));
+  n++;
 }
 log(`${n} runtime libraries -> src-tauri/resources`);
 

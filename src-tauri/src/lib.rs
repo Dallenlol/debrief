@@ -4,6 +4,7 @@ mod events;
 mod recorder;
 mod settings;
 mod shortcuts;
+mod smoke;
 mod state;
 mod tray;
 mod windows;
@@ -37,6 +38,9 @@ pub fn run() {
             log::info!("Hark started; data dir {}", hark_store::data_dir().display());
             if handle.state::<AppState>().ffmpeg.is_none() {
                 log::warn!("ffmpeg sidecar not found; screen video disabled");
+            }
+            if std::env::var_os("HARK_SMOKE").is_some() {
+                smoke::run(handle);
             }
             Ok(())
         })

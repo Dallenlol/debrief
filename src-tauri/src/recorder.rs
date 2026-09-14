@@ -102,7 +102,7 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
     // Live captions if the live model is downloaded.
     let tier = settings.tier(&state.hardware);
     let (live_id, _, _) = settings.model_ids(&state.catalog, tier);
-    let (pcm_tx, live) = match state.whisper(&live_id) {
+    let (pcm_tx, live) = match state.whisper_or_any(&[&live_id]) {
         Some(engine) => {
             let (pcm_tx, pcm_rx) = crossbeam_channel::unbounded::<Vec<f32>>();
             let (cap_tx2, cap_rx2) = crossbeam_channel::unbounded::<Caption>();
@@ -254,7 +254,7 @@ fn post_process(app: &AppHandle, mut meeting: Meeting) {
     let settings = state.settings.read().clone();
     let tier = settings.tier(&state.hardware);
     let (live_id, quality_id, _) = settings.model_ids(&state.catalog, tier);
-    let engine = state.whisper(&quality_id).or_else(|| state.whisper(&live_id));
+    let engine = state.whisper_or_any(&[&quality_id, &live_id]);
     let result = match engine {
         Some(engine) => transcribe_file(&engine, &dir.join("mix.wav"), settings.language.as_deref()).and_then(|caps| {
             let segs: Vec<NewSegment> = caps

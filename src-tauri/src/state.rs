@@ -86,6 +86,24 @@ impl AppState {
         }
     }
 
+    /// Preferred model if downloaded, else any downloaded ASR model (largest first).
+    pub fn whisper_or_any(&self, preferred: &[&str]) -> Option<Arc<WhisperEngine>> {
+        for id in preferred {
+            if let Some(w) = self.whisper(id) {
+                return Some(w);
+            }
+        }
+        let dir = self.models_dir();
+        let mut candidates: Vec<&hark_models::ModelSpec> = self
+            .catalog
+            .all()
+            .iter()
+            .filter(|m| m.kind == hark_models::ModelKind::Asr && hark_models::is_present(&dir, m))
+            .collect();
+        candidates.sort_by_key(|m| std::cmp::Reverse(m.size_bytes));
+        candidates.into_iter().find_map(|m| self.whisper(&m.id))
+    }
+
     pub fn unload_engines(&self) {
         let mut e = self.engines.lock();
         e.whisper.clear();

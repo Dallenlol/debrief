@@ -1,0 +1,256 @@
+import { openPath } from "@tauri-apps/plugin-opener";
+import { Download, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button, Card, Input, Meter, SectionTitle, Select, Spinner, Toggle } from "@/components/ui";
+import { appLabel, fmtBytes } from "@/lib/format";
+import { cmd, subscribe, type AudioDevice, type Hardware, type ModelRow, type Settings, type Tier } from "@/lib/ipc";
+
+const TIER_LABEL: Record<Tier, string> = { cpu_low: "CPU, light models", cpu_high: "CPU, bigger models", gpu: "GPU, best models" };
+
+export function SettingsPage() {
+  const [s, setS] = useState<Settings | null>(null);
+  const [devices, setDevices] = useState<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>({ inputs: [], outputs: [] });
+  const [levels, setLevels] = useState<[number, number]>([-100, -100]);
+  const [hw, setHw] = useState<{ hardware: Hardware; tier: Tier; effective_tier: Tier } | null>(null);
+  const [models, setModels] = useState<ModelRow[]>([]);
+  const [progress, setProgress] = useState<Record<string, { done: number; total: number; error?: string | null }>>({});
+  const [data, setData] = useState<{ data_dir: string; recordings_bytes: number; models_bytes: number } | null>(null);
+  const [hotkeyDraft, setHotkeyDraft] = useState("");
+  const [saved, setSaved] = useState<string | null>(null);
+
+  const reloadModels = () => void cmd.listModels().then(setModels);
+
+  useEffect(() => {
+    void cmd.getSettings().then((x) => {
+      setS(x);
+      setHotkeyDraft(x.hotkey);
+    });
+    void cmd.listAudioDevices().then(setDevices);
+    void cmd.probeHardware().then(setHw);
+    void cmd.dataInfo().then(setData);
+    reloadModels();
+    return subscribe("model_progress", (p) => {
+      setProgress((m) => ({ ...m, [p.id]: { done: p.done, total: p.total, error: p.error } }));
+      if (p.status !== "downloading") {
+        reloadModels();
+        void cmd.dataInfo().then(setData);
+      }
+    });
+  }, []);
+
+  // Live meters while on this page (paused when recording; the recorder owns the devices then).
+  useEffect(() => {
+    if (!s) return;
+    let stop = false;
+    const loop = async () => {
+      while (!stop) {
+        try {
+          const st = await cmd.recordingStatus();
+          if (st.state === "idle") setLevels(await cmd.sampleLevels(s.mic_device, s.loopback_device));
+        } catch {
+          /* ignore */
+        }
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    };
+    void loop();
+    return () => {
+      stop = true;
+    };
+  }, [s?.mic_device, s?.loopback_device, s]);
+
+  const update = async (patch: Partial<Settings>) => {
+    if (!s) return;
+    const next = { ...s, ...patch };
+    setS(next);
+    try {
+      await cmd.setSettings(next);
+      setSaved("Saved");
+      setTimeout(() => setSaved(null), 1200);
+      if (patch.tier_override !== undefined || patch.live_asr_model !== undefined || patch.quality_asr_model !== undefined || patch.llm_model !== undefined) {
+        reloadModels();
+        void cmd.probeHardware().then(setHw);
+      }
+    } catch (e) {
+      setSaved(String(e));
+    }
+  };
+
+  if (!s) return <div className="p-8"><Spinner /></div>;
+
+  const asr = models.filter((m) => m.spec.kind === "asr");
+  const llm = models.filter((m) => m.spec.kind === "llm");
+
+  return (
+    <div className="mx-auto max-w-3xl px-8 py-8">
+      <header className="mb-8 flex items-end justify-between">
+        <div>
+          <h1 className="font-serif text-[34px] leading-none tracking-tight">Settings</h1>
+          <p className="mt-1.5 text-[13px] text-ink-3">Everything stays on this computer.</p>
+        </div>
+        <span className="text-[12px] text-moss">{saved}</span>
+      </header>
+
+      <section className="mb-10">
+        <SectionTitle>Audio</SectionTitle>
+        <Card className="divide-y divide-line px-5">
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <label className="block">
+              <span className="mb-1 block text-[12px] font-medium text-ink-2">Microphone</span>
+              <Select value={s.mic_device ?? ""} onChange={(e) => void update({ mic_device: e.target.value || null })}>
+                <option value="">System default</option>
+                {devices.inputs.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </Select>
+              <Meter db={levels[0]} className="mt-2" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[12px] font-medium text-ink-2">System audio (what you hear)</span>
+              <Select value={s.loopback_device ?? ""} onChange={(e) => void update({ loopback_device: e.target.value || null })}>
+                <option value="">System default output</option>
+                {devices.outputs.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </Select>
+              <Meter db={levels[1]} className="mt-2" />
+            </label>
+          </div>
+          <Toggle label="Capture system audio" description="Records the other participants. Turn off to record only your microphone." checked={s.capture_system} onChange={(v) => void update({ capture_system: v })} />
+          <Toggle label="Record screen video by default" description="You can still toggle this on the Record popup each time." checked={s.video_enabled} onChange={(v) => void update({ video_enabled: v })} />
+          <div className="py-4">
+            <span className="mb-1 block text-[12px] font-medium text-ink-2">Your name (used for your speaker label)</span>
+            <Input value={s.user_name} onChange={(e) => setS({ ...s, user_name: e.target.value })} onBlur={() => void update({ user_name: s.user_name })} className="max-w-xs" />
+          </div>
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle>Detection</SectionTitle>
+        <Card className="divide-y divide-line px-5">
+          <Toggle label="Offer to record when a call is detected" description="Hark only shows a popup. It never records without you clicking Record." checked={s.detection_enabled} onChange={(v) => void update({ detection_enabled: v })} />
+          <Toggle label="Also detect by audio activity" description="Catches apps we don't know about when both mic and speakers are active." checked={s.audio_activity_enabled} onChange={(v) => void update({ audio_activity_enabled: v })} />
+          <div className="py-4">
+            <span className="mb-1 block text-[12px] font-medium text-ink-2">Global hotkey (start / stop)</span>
+            <form
+              className="flex max-w-md gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void update({ hotkey: hotkeyDraft });
+              }}
+            >
+              <Input value={hotkeyDraft} onChange={(e) => setHotkeyDraft(e.target.value)} placeholder="CmdOrCtrl+Shift+R" className="font-mono" />
+              <Button type="submit" variant="outline" size="md">Apply</Button>
+            </form>
+          </div>
+          {s.never_apps.length > 0 && (
+            <div className="py-4">
+              <span className="mb-2 block text-[12px] font-medium text-ink-2">Never ask for</span>
+              <div className="flex flex-wrap gap-2">
+                {s.never_apps.map((a) => (
+                  <button key={a} onClick={() => void update({ never_apps: s.never_apps.filter((x) => x !== a) })} className="inline-flex items-center gap-1 rounded-full bg-canvas-3 px-2.5 py-1 text-[12px] hover:bg-line-2">
+                    {appLabel(a)} <X size={12} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <Toggle label="Keep running in the tray when the window is closed" checked={s.close_to_tray} onChange={(v) => void update({ close_to_tray: v })} />
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle hint={hw ? `${hw.hardware.cpu_name || "CPU"}, ${Math.round(hw.hardware.ram_gb)} GB RAM${hw.hardware.gpu ? `, ${hw.hardware.gpu.name} (${Math.round(hw.hardware.gpu.vram_gb)} GB)` : ""}` : ""}>
+          AI models
+        </SectionTitle>
+        <Card className="px-5">
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <label className="block">
+              <span className="mb-1 block text-[12px] font-medium text-ink-2">Model tier</span>
+              <Select value={s.tier_override ?? ""} onChange={(e) => void update({ tier_override: (e.target.value || null) as Tier | null })}>
+                <option value="">Auto{hw ? ` (${TIER_LABEL[hw.tier]})` : ""}</option>
+                {(["cpu_low", "cpu_high", "gpu"] as Tier[]).map((t) => (
+                  <option key={t} value={t}>{TIER_LABEL[t]}</option>
+                ))}
+              </Select>
+            </label>
+            <div className="grid grid-cols-1 gap-2">
+              <ModelPick label="Live captions" value={s.live_asr_model} options={asr} onChange={(v) => void update({ live_asr_model: v })} />
+              <ModelPick label="Final transcript" value={s.quality_asr_model} options={asr} onChange={(v) => void update({ quality_asr_model: v })} />
+              <ModelPick label="Summaries & chat" value={s.llm_model} options={llm} onChange={(v) => void update({ llm_model: v })} />
+            </div>
+          </div>
+          <ul className="divide-y divide-line border-t border-line">
+            {models.map((m) => {
+              const p = progress[m.spec.id];
+              const pct = p && p.total ? Math.round((p.done / p.total) * 100) : 0;
+              return (
+                <li key={m.spec.id} className="flex items-center gap-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-[14px] font-medium">
+                      {m.spec.name}
+                      {m.roles.map((r) => (
+                        <span key={r} className="rounded bg-canvas-3 px-1.5 py-px text-[10px] font-semibold tracking-wide text-ink-2 uppercase">{r}</span>
+                      ))}
+                    </div>
+                    <div className="text-[12px] text-ink-3">{m.spec.note} {fmtBytes(m.spec.size_bytes)}</div>
+                    {m.downloading && (
+                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-line">
+                        <div className="h-full bg-ink transition-[width]" style={{ width: `${pct}%` }} />
+                      </div>
+                    )}
+                    {p?.error && <div className="mt-1 text-[12px] text-ember">{p.error}</div>}
+                  </div>
+                  {m.present ? (
+                    <Button variant="ghost" size="sm" onClick={() => cmd.removeModel(m.spec.id).then(reloadModels)} title="Delete from disk">
+                      <Trash2 size={14} /> Remove
+                    </Button>
+                  ) : m.downloading ? (
+                    <Button variant="ghost" size="sm" onClick={() => void cmd.cancelDownload(m.spec.id)}>
+                      <X size={14} /> {pct}%
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => { void cmd.downloadModel(m.spec.id).catch(() => {}); reloadModels(); }}>
+                      <Download size={14} /> Download
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle>Data</SectionTitle>
+        <Card className="px-5 py-4 text-[13px]">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="truncate font-mono text-[12px] text-ink-2">{data?.data_dir}</div>
+              <div className="mt-1 text-ink-3">
+                Recordings {fmtBytes(data?.recordings_bytes ?? 0)}, models {fmtBytes(data?.models_bytes ?? 0)}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => data && void openPath(data.data_dir)}>Open folder</Button>
+          </div>
+        </Card>
+      </section>
+
+      <p className="text-[12px] text-ink-3">Hark 0.1.0. Open source, MIT. No accounts, no telemetry, no cloud.</p>
+    </div>
+  );
+}
+
+function ModelPick({ label, value, options, onChange }: { label: string; value: string | null; options: ModelRow[]; onChange: (v: string | null) => void }) {
+  return (
+    <label className="flex items-center gap-3">
+      <span className="w-28 shrink-0 text-[12px] font-medium text-ink-2">{label}</span>
+      <Select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} className="h-8 text-[13px]">
+        <option value="">Tier default</option>
+        {options.map((o) => (
+          <option key={o.spec.id} value={o.spec.id}>{o.spec.name}{o.present ? "" : " (not downloaded)"}</option>
+        ))}
+      </Select>
+    </label>
+  );
+}

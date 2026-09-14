@@ -1,6 +1,161 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/manrope";
+@import "@fontsource/instrument-serif";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-canvas-2: var(--canvas-2);
+  --color-canvas-3: var(--canvas-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-ember: var(--ember);
+  --color-ember-2: var(--ember-2);
+  --color-ember-soft: var(--ember-soft);
+  --color-moss: var(--moss);
+  --color-moss-soft: var(--moss-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-card: 0 1px 2px rgb(20 18 16 / 0.04), 0 8px 24px -12px rgb(20 18 16 / 0.12);
+  --shadow-float: 0 2px 6px rgb(20 18 16 / 0.08), 0 24px 48px -16px rgb(20 18 16 / 0.28);
+}
 
 :root {
-  font-family: "Inter Variable", system-ui, sans-serif;
+  --canvas: oklch(0.985 0.006 80);
+  --canvas-2: oklch(0.965 0.008 80);
+  --canvas-3: oklch(0.935 0.01 80);
+  --ink: oklch(0.2 0.01 60);
+  --ink-2: oklch(0.45 0.012 60);
+  --ink-3: oklch(0.62 0.012 60);
+  --line: oklch(0.9 0.008 80);
+  --line-2: oklch(0.84 0.01 80);
+  --ember: oklch(0.62 0.2 32);
+  --ember-2: oklch(0.55 0.2 32);
+  --ember-soft: oklch(0.95 0.035 32);
+  --moss: oklch(0.55 0.12 150);
+  --moss-soft: oklch(0.95 0.035 150);
+  --amber: oklch(0.7 0.15 75);
+  --amber-soft: oklch(0.96 0.05 85);
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: oklch(0.17 0.008 60);
+  --canvas-2: oklch(0.21 0.009 60);
+  --canvas-3: oklch(0.26 0.01 60);
+  --ink: oklch(0.95 0.006 80);
+  --ink-2: oklch(0.72 0.01 80);
+  --ink-3: oklch(0.55 0.01 80);
+  --line: oklch(0.27 0.01 60);
+  --line-2: oklch(0.34 0.012 60);
+  --ember: oklch(0.7 0.19 32);
+  --ember-2: oklch(0.76 0.18 32);
+  --ember-soft: oklch(0.3 0.06 32);
+  --moss: oklch(0.72 0.12 150);
+  --moss-soft: oklch(0.28 0.05 150);
+  --amber: oklch(0.8 0.14 80);
+  --amber-soft: oklch(0.3 0.06 80);
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  user-select: none;
+}
+
+body.transparent {
+  background: transparent;
+}
+
+::selection {
+  background: var(--ember-soft);
+}
+
+/* Subtle paper grain on the canvas. */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--ember) 50%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+.rec-dot {
+  animation: pulse-dot 1.6s ease-out infinite;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
 }

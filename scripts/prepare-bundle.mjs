@@ -77,27 +77,60 @@ const targetDir = triple === hostTriple ? path.join(root, "target", profile) : p
 copyFileSync(path.join(targetDir, `hark-diarize${exe}`), path.join(binDir, `hark-diarize-${triple}${exe}`));
 log("hark-diarize sidecar copied");
 
-// 3. runtime libs (llama.cpp dynamic + sherpa-onnx): their sys crates copy the shared
-//    libraries into target/<profile> when built.
-log(`building hark-llm (${profile}) to collect runtime libraries...`);
+// 3. runtime libs (llama.cpp dynamic + sherpa-onnx). Their build scripts copy shared
+//    libraries into target/<profile>, but only when they actually run - on a warm CI cache
+//    that step is skipped - so collect from the build-script output dirs and the sherpa
+//    download cache instead, and fail if anything expected is missing.
+log(`building hark-llm (${profile}) to ensure runtime libraries exist...`);
 execFileSync("cargo", ["build", "-p", "hark-llm", ...profileArgs, ...featArgs, ...targetArgs], { stdio: "inherit", cwd: root });
 const libExt = win ? ".dll" : mac ? ".dylib" : ".so";
+const isLib = (f) => f.includes(libExt) && !f.startsWith("hark_lib") && !f.startsWith("libhark_lib");
+const found = new Map(); // name -> path (newest wins)
+const consider = (p) => {
+  const name = path.basename(p);
+  if (!isLib(name)) return;
+  let st;
+  try { st = statSync(p); } catch { return; } // dangling symlink
+  if (!st.isFile()) return;
+  const prev = found.get(name);
+  if (!prev || st.mtimeMs > prev.mtime) found.set(name, { path: p, mtime: st.mtimeMs });
+};
+for (const f of safeReaddir(targetDir)) consider(path.join(targetDir, f));
+walk(path.join(targetDir, "build"), 5, (p) => /llama-cpp-sys-2-|sherpa-rs-sys-/.test(p) && consider(p));
+for (const cache of [path.join(os.homedir(), ".cache", "sherpa-rs"), path.join(os.homedir(), "Library", "Caches", "sherpa-rs"), path.join(os.homedir(), "AppData", "Local", "sherpa-rs")]) {
+  walk(cache, 6, consider);
+}
 let n = 0;
-for (const f of readdirSync(targetDir)) {
-  if (!f.includes(libExt) || f.startsWith("hark_lib") || f.startsWith("libhark_lib")) continue;
-  const src = path.join(targetDir, f);
-  // macOS ships versioned dylib symlink chains; copy the real file under each name and skip dangling links.
-  let real;
-  try {
-    real = statSync(src).isFile() ? src : null;
-  } catch {
-    real = null;
-  }
-  if (!real) continue;
-  copyFileSync(real, path.join(resDir, f));
+for (const [name, { path: p }] of found) {
+  copyFileSync(p, path.join(resDir, name));
   n++;
 }
+const required = win
+  ? ["llama.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "sherpa-onnx-c-api.dll", "onnxruntime.dll"]
+  : mac
+    ? ["libllama.dylib", "libggml.dylib", "libggml-base.dylib", "libggml-cpu.dylib", "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"]
+    : [];
+const missing = required.filter((r) => !found.has(r) && ![...found.keys()].some((k) => k.startsWith(r.replace(/\.(dll|dylib)$/, ""))));
+if (missing.length) {
+  console.error(`[prepare-bundle] missing runtime libraries: ${missing.join(", ")}`);
+  process.exit(1);
+}
 log(`${n} runtime libraries -> src-tauri/resources`);
+
+function safeReaddir(dir) {
+  try { return readdirSync(dir); } catch { return []; }
+}
+
+function walk(dir, depth, visit) {
+  if (depth < 0) return;
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walk(p, depth - 1, visit);
+    else visit(p);
+  }
+}
 
 async function download(url, dest) {
   const res = await fetch(url, { redirect: "follow", headers: { "user-agent": "hark-prepare-bundle" } });

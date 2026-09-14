@@ -195,13 +195,27 @@ pub struct SummaryResult {
     pub structured: Structured,
 }
 
-pub const SUMMARY_SYSTEM: &str = "You write precise, faithful meeting notes from transcripts. Follow the requested section structure exactly and output markdown only.";
+pub const SUMMARY_SYSTEM: &str = "You write precise, faithful meeting notes from transcripts. Follow the requested section structure exactly and output markdown only. Write in the same language as the transcript.";
 
-/// Render the template and ask the model. Long transcripts are truncated from the middle to fit `max_chars`.
+/// Render the template and ask the model. Transcripts longer than `max_chars`
+/// are first condensed block-by-block (see `chunked`) so nothing is dropped.
 pub fn generate(backend: &dyn LlmBackend, template_body: &str, vars: &TemplateVars, max_chars: usize) -> Result<SummaryResult, LlmError> {
+    generate_with_progress(backend, template_body, vars, max_chars, |_, _| {})
+}
+
+/// `on_progress(done, total)` fires once per condensed block (never for short transcripts).
+pub fn generate_with_progress(
+    backend: &dyn LlmBackend,
+    template_body: &str,
+    vars: &TemplateVars,
+    max_chars: usize,
+    on_progress: impl FnMut(usize, usize),
+) -> Result<SummaryResult, LlmError> {
     let mut v = vars.clone();
     if v.transcript.len() > max_chars {
-        v.transcript = truncate_middle(&v.transcript, max_chars);
+        // Blocks are ~5/6 of the budget so the joined notes stay well under it.
+        let notes = crate::chunked::notes_for_blocks(backend, &v.transcript, max_chars * 5 / 6, on_progress)?;
+        v.transcript = if notes.len() > max_chars { truncate_middle(&notes, max_chars) } else { notes };
     }
     let prompt = render(template_body, &v);
     let msgs = [ChatMessage::system(SUMMARY_SYSTEM), ChatMessage::user(prompt)];

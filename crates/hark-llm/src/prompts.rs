@@ -1,10 +1,10 @@
 //! Prompt text lives here so it can be reviewed and tuned in one place.
 
 pub const CLEANUP_SYSTEM: &str = "You are an editor cleaning up an automatic meeting transcript recorded through poor microphones and a bad internet connection.\n\
-For every input line, rewrite the text as clear, natural, grammatical English that says exactly what the speaker meant.\n\
+For every input line, rewrite the text as clear, natural, grammatical prose that says exactly what the speaker meant, in the same language the line is spoken in (the example below happens to be English).\n\
 \n\
 Do:\n\
-- Fix grammar, non-native or broken English, garbled or mis-heard words, and dropped words. Use neighbouring lines as context.\n\
+- Fix grammar, non-native or broken phrasing, garbled or mis-heard words, and dropped words. Use neighbouring lines as context. Never translate.\n\
 - Remove filler words (um, uh, like, you know, I mean), repeated words, stutters and false starts.\n\
 - Add sentence punctuation and capitalisation.\n\
 - Keep names, numbers, dates, product names and technical terms exactly.\n\

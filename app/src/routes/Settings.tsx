@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { TemplatesEditor } from "@/components/TemplatesEditor";
 import { Button, Card, Input, Meter, SectionTitle, Select, Spinner, Toggle } from "@/components/ui";
 import { appLabel, fmtBytes } from "@/lib/format";
+import { LANGUAGES } from "@/lib/languages";
 import { cmd, subscribe, type AudioDevice, type Hardware, type ModelRow, type Settings, type ShareInfo, type Tier } from "@/lib/ipc";
 
 const TIER_LABEL: Record<Tier, string> = { cpu_low: "CPU, light models", cpu_high: "CPU, bigger models", gpu: "GPU, best models" };
@@ -131,6 +132,13 @@ export function SettingsPage() {
           <div className="py-4">
             <span className="mb-1 block text-[12px] font-medium text-ink-2">Your name (used for your speaker label)</span>
             <Input value={s.user_name} onChange={(e) => setS({ ...s, user_name: e.target.value })} onBlur={() => void update({ user_name: s.user_name })} className="max-w-xs" />
+          </div>
+          <div className="py-4">
+            <span className="mb-1 block text-[12px] font-medium text-ink-2">Spoken language</span>
+            <Select value={s.language ?? ""} onChange={(e) => void update({ language: e.target.value || null })} className="max-w-xs">
+              {LANGUAGES.map((l) => <option key={l.code ?? "auto"} value={l.code ?? ""}>{l.name}</option>)}
+            </Select>
+            <span className="mt-1 block text-[12px] text-ink-3">Auto-detect works well for whole meetings in one language; pick one for mixed or short calls. Cleanup, summaries and chat follow the transcript's language.</span>
           </div>
         </Card>
       </section>

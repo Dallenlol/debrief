@@ -1,10 +1,11 @@
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Download, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TemplatesEditor } from "@/components/TemplatesEditor";
 import { Button, Card, Input, Meter, SectionTitle, Select, Spinner, Toggle } from "@/components/ui";
 import { appLabel, fmtBytes } from "@/lib/format";
-import { cmd, subscribe, type AudioDevice, type Hardware, type ModelRow, type Settings, type Tier } from "@/lib/ipc";
+import { cmd, subscribe, type AudioDevice, type Hardware, type ModelRow, type Settings, type ShareInfo, type Tier } from "@/lib/ipc";
 
 const TIER_LABEL: Record<Tier, string> = { cpu_low: "CPU, light models", cpu_high: "CPU, bigger models", gpu: "GPU, best models" };
 
@@ -19,6 +20,8 @@ export function SettingsPage() {
   const [hotkeyDraft, setHotkeyDraft] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
   const [endpointTest, setEndpointTest] = useState<string | null>(null);
+  const [dataMsg, setDataMsg] = useState<string | null>(null);
+  const [shares, setShares] = useState<ShareInfo[]>([]);
 
   const reloadModels = () => void cmd.listModels().then(setModels);
 
@@ -30,6 +33,7 @@ export function SettingsPage() {
     void cmd.listAudioDevices().then(setDevices);
     void cmd.probeHardware().then(setHw);
     void cmd.dataInfo().then(setData);
+    void cmd.listShares().then(setShares);
     reloadModels();
     return subscribe("model_progress", (p) => {
       setProgress((m) => ({ ...m, [p.id]: { done: p.done, total: p.total, error: p.error } }));
@@ -280,15 +284,75 @@ export function SettingsPage() {
 
       <section className="mb-10">
         <SectionTitle>Data</SectionTitle>
-        <Card className="px-5 py-4 text-[13px]">
-          <div className="flex items-center justify-between gap-4">
+        <Card className="divide-y divide-line px-5 text-[13px]">
+          <div className="flex items-center justify-between gap-4 py-4">
             <div className="min-w-0">
               <div className="truncate font-mono text-[12px] text-ink-2">{data?.data_dir}</div>
               <div className="mt-1 text-ink-3">
                 Recordings {fmtBytes(data?.recordings_bytes ?? 0)}, models {fmtBytes(data?.models_bytes ?? 0)}
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => data && void openPath(data.data_dir)}>Open folder</Button>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" size="sm" onClick={() => data && void openPath(data.data_dir)}>Open folder</Button>
+              <Button variant="outline" size="sm" onClick={() => void (async () => {
+                const dir = await open({ directory: true, title: "Choose the new Hark data folder" });
+                if (!dir) return;
+                setDataMsg("Copying...");
+                try {
+                  const to = await cmd.changeDataDir(dir as string);
+                  setDataMsg(`Copied to ${to}. Restart Hark to use it; the old folder was left in place.`);
+                } catch (e) {
+                  setDataMsg(String(e));
+                }
+              })()}>Change folder</Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 py-4">
+            <span className="mr-2 text-ink-2">Move meetings between computers:</span>
+            <Button variant="outline" size="sm" onClick={() => void (async () => {
+              const out = await save({ defaultPath: "hark-library.hark", filters: [{ name: "Hark bundle", extensions: ["hark"] }] });
+              if (!out) return;
+              setDataMsg("Exporting...");
+              try {
+                const n = await cmd.exportMeetings([], out, true);
+                setDataMsg(`Exported ${n} meeting${n === 1 ? "" : "s"} to ${out}`);
+              } catch (e) {
+                setDataMsg(String(e));
+              }
+            })()}>Export everything</Button>
+            <Button variant="outline" size="sm" onClick={() => void (async () => {
+              const p = await open({ filters: [{ name: "Hark bundle", extensions: ["hark"] }], multiple: false });
+              if (!p) return;
+              setDataMsg("Importing...");
+              try {
+                const r = await cmd.importMeetings(p as string);
+                setDataMsg(`Imported ${r.imported}, skipped ${r.skipped_existing} already here${r.errors.length ? `, errors: ${r.errors.join("; ")}` : ""}.`);
+                void cmd.dataInfo().then(setData);
+              } catch (e) {
+                setDataMsg(String(e));
+              }
+            })()}>Import bundle</Button>
+            {dataMsg && <span className="basis-full text-[12px] text-ink-2">{dataMsg}</span>}
+          </div>
+          <div className="py-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-ink-2">Share links (port {s.share_port})</span>
+              <span className="text-[12px] text-ink-3">{shares.filter((x) => x.share.enabled).length} active</span>
+            </div>
+            {shares.length === 0 ? (
+              <div className="text-[12px] text-ink-3">No links yet. Use Share on a meeting.</div>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {shares.map((x) => (
+                  <li key={x.share.token} className="flex items-center gap-2 text-[12px]">
+                    <span className="min-w-0 flex-1 truncate">{x.share.meeting_title} <span className="text-ink-3">({x.share.kind})</span></span>
+                    <span className="truncate font-mono text-ink-3">{x.url}</span>
+                    <Button variant="ghost" size="sm" onClick={() => void cmd.setShareEnabled(x.share.token, !x.share.enabled).then(() => cmd.listShares()).then(setShares)}>{x.share.enabled ? "Disable" : "Enable"}</Button>
+                    <Button variant="danger" size="sm" onClick={() => void cmd.deleteShare(x.share.token).then(() => cmd.listShares()).then(setShares)}><Trash2 size={13} /></Button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </Card>
       </section>

@@ -1,13 +1,14 @@
-import { ArrowLeft, Check, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, FolderOpen, Pencil, RefreshCw, Share2, Sparkles, Tag as TagIcon, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Markdown } from "@/components/Markdown";
 import { Player, type PlayerHandle } from "@/components/Player";
+import { ShareDialog } from "@/components/ShareDialog";
 import { Transcript } from "@/components/Transcript";
 import { Badge, Button, Input, SectionTitle, Spinner } from "@/components/ui";
 import { appLabel, fmtDate, fmtDuration, fmtTime } from "@/lib/format";
-import { cmd, subscribe, type MeetingDetail, type Summary, type Template } from "@/lib/ipc";
+import { cmd, subscribe, type Folder, type MeetingDetail, type Summary, type Tag, type Template } from "@/lib/ipc";
 
 export function MeetingPage() {
   const { id = "" } = useParams();
@@ -25,6 +26,10 @@ export function MeetingPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState<string>("");
+  const [share, setShare] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const player = useRef<PlayerHandle>(null);
 
   const load = useCallback(() => {
@@ -37,6 +42,8 @@ export function MeetingPage() {
       setSummary(s);
       if (s) setTemplateId((t) => t || s.template_id);
     });
+    void cmd.meetingTags(id).then(setTags);
+    void cmd.listFolders().then(setFolders);
   }, [id]);
 
   useEffect(() => {
@@ -105,6 +112,7 @@ export function MeetingPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-6">
+      {share && <ShareDialog meetingId={m.id} title={m.title} durationMs={m.duration_ms} hasVideo={!!detail.media.video} currentMs={currentMs} onClose={() => setShare(false)} />}
       <Link to="/" className="focus-ring inline-flex items-center gap-1.5 rounded text-[13px] text-ink-3 hover:text-ink">
         <ArrowLeft size={14} /> Library
       </Link>
@@ -132,14 +140,48 @@ export function MeetingPage() {
               </button>
             </h1>
           )}
-          <div className="mt-1 flex items-center gap-3 text-[13px] text-ink-3">
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-[13px] text-ink-3">
             <span>{appLabel(m.app)}</span>
             <span>{fmtDate(m.started_at)} at {fmtTime(m.started_at)}</span>
             <span className="font-mono">{fmtDuration(m.duration_ms)}</span>
             <Badge tone={m.status === "ready" ? "moss" : m.status === "failed" ? "ember" : "amber"}>{m.status}</Badge>
+            <label className="inline-flex items-center gap-1">
+              <FolderOpen size={13} />
+              <select
+                value={m.folder_id ?? ""}
+                onChange={(e) => void cmd.moveMeeting(m.id, e.target.value || null).then(load)}
+                className="focus-ring rounded border border-transparent bg-transparent text-[12px] hover:border-line-2"
+              >
+                <option value="">Unfiled</option>
+                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {tags.map((t) => (
+              <span key={t.id} className="inline-flex items-center gap-1 rounded-full bg-canvas-3 px-2 py-0.5 text-[12px] text-ink-2">
+                {t.name}
+                <button onClick={() => void cmd.untagMeeting(m.id, t.id).then(() => cmd.meetingTags(m.id)).then(setTags)} className="text-ink-3 hover:text-ember"><X size={11} /></button>
+              </span>
+            ))}
+            <form
+              className="inline-flex items-center gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const name = tagDraft.trim();
+                if (!name) return;
+                void cmd.tagMeeting(m.id, name).then(() => cmd.meetingTags(m.id)).then((t) => { setTags(t); setTagDraft(""); });
+              }}
+            >
+              <TagIcon size={12} className="text-ink-3" />
+              <input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} placeholder="add tag" className="w-20 bg-transparent text-[12px] outline-none placeholder:text-ink-3" />
+            </form>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => setShare(true)} disabled={m.status === "recording"}>
+            <Share2 size={14} /> Share
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => void cmd.retranscribe(m.id)} disabled={processing} title="Run transcription and speaker detection again">
             <RefreshCw size={14} /> Re-transcribe
           </Button>

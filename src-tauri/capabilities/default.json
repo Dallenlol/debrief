@@ -23,6 +23,9 @@
     "opener:default",
     "notification:default",
     "os:default",
-    "global-shortcut:allow-is-registered"
+    "global-shortcut:allow-is-registered",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "opener:allow-open-path"
   ]
 }

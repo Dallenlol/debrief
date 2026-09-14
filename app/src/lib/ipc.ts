@@ -90,6 +90,7 @@ export interface Settings {
   diarize_enabled: boolean;
   summary_enabled: boolean;
   default_template_id: string;
+  share_port: number;
 }
 
 export interface Template {
@@ -131,6 +132,48 @@ export interface ChatMessage {
   content: string;
   citations: unknown;
   created_at: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  default_template_id: string | null;
+  meeting_count: number;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  meeting_count: number;
+}
+
+export interface MeetingFilter {
+  /** null = all; [null] = unfiled; [id] = folder subtree */
+  folder: null | [string | null];
+  tag_id: string | null;
+}
+
+export interface Share {
+  token: string;
+  meeting_id: string;
+  meeting_title: string;
+  kind: "meeting" | "clip";
+  start_ms: number | null;
+  end_ms: number | null;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface ShareInfo {
+  share: Share;
+  url: string;
+}
+
+export interface ImportReport {
+  imported: number;
+  skipped_existing: number;
+  errors: string[];
 }
 
 export interface AudioDevice {
@@ -227,6 +270,28 @@ export const cmd = {
   chatMessages: (chatId: string) => invoke<ChatMessage[]>("chat_messages", { chatId }),
   sendChat: (chatId: string, text: string) => invoke<ChatMessage>("send_chat", { chatId, text }),
   cancelChat: (chatId: string) => invoke<void>("cancel_chat", { chatId }),
+
+  listFolders: () => invoke<Folder[]>("list_folders"),
+  createFolder: (name: string, parentId: string | null) => invoke<Folder>("create_folder", { name, parentId }),
+  updateFolder: (id: string, name: string, parentId: string | null, defaultTemplateId: string | null) =>
+    invoke<void>("update_folder", { id, name, parentId, defaultTemplateId }),
+  deleteFolder: (id: string) => invoke<void>("delete_folder", { id }),
+  moveMeeting: (id: string, folderId: string | null) => invoke<void>("move_meeting", { id, folderId }),
+  listMeetingsFiltered: (filter: { folder: null | (string | null)[]; tag_id: string | null }) =>
+    invoke<Meeting[]>("list_meetings_filtered", { filter: { folder: filter.folder === null ? null : filter.folder[0], tag_id: filter.tag_id } }),
+  listTags: () => invoke<Tag[]>("list_tags"),
+  meetingTags: (id: string) => invoke<Tag[]>("meeting_tags", { id }),
+  tagMeeting: (id: string, name: string) => invoke<Tag>("tag_meeting", { id, name }),
+  untagMeeting: (id: string, tagId: string) => invoke<void>("untag_meeting", { id, tagId }),
+  exportClip: (id: string, startMs: number, endMs: number, out: string) => invoke<string>("export_clip", { id, startMs, endMs, out }),
+  createShare: (id: string, startMs?: number, endMs?: number) => invoke<ShareInfo>("create_share", { id, startMs, endMs }),
+  listShares: () => invoke<ShareInfo[]>("list_shares"),
+  setShareEnabled: (token: string, enabled: boolean) => invoke<void>("set_share_enabled", { token, enabled }),
+  deleteShare: (token: string) => invoke<void>("delete_share", { token }),
+  exportMeetings: (ids: string[], out: string, includeVideo: boolean) => invoke<number>("export_meetings", { ids, out, includeVideo }),
+  importMeetings: (path: string) => invoke<ImportReport>("import_meetings", { path }),
+  exportHtml: (id: string, outDir: string) => invoke<string>("export_html", { id, outDir }),
+  changeDataDir: (newDir: string) => invoke<string>("change_data_dir", { newDir }),
 
   listAudioDevices: () => invoke<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>("list_audio_devices"),
   sampleLevels: (mic: string | null, loopback: string | null) =>

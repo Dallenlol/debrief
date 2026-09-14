@@ -55,6 +55,14 @@ export function Onboarding() {
 
   const needed = models.filter((m) => m.roles.length > 0);
   const allPresent = needed.length > 0 && needed.every((m) => m.present);
+  // Small models that make recording useful right away; the big ones can finish in the background.
+  const isEssential = (m: ModelRow) => m.roles.some((r) => r === "live" || r === "speakers" || r === "search");
+  const essentials = needed.filter(isEssential);
+  const later = needed.filter((m) => !isEssential(m));
+  const essentialsPresent = essentials.length > 0 && essentials.every((m) => m.present);
+  const bytes = (xs: ModelRow[]) => xs.filter((m) => !m.present).reduce((n, m) => n + m.spec.size_bytes, 0);
+  const startAll = (xs: ModelRow[]) => xs.filter((m) => !m.present && !m.downloading).forEach((m) => void cmd.downloadModel(m.spec.id).catch(() => {}));
+  const ROLE_LABEL: Record<string, string> = { live: "live captions", quality: "final transcript", llm: "summaries & chat", speakers: "who spoke", search: "semantic search" };
 
   return (
     <div className="grain flex h-full items-center justify-center p-8">
@@ -130,14 +138,16 @@ export function Onboarding() {
         {step === 2 && (
           <div className="rise">
             <h1 className="font-serif text-[40px] leading-none tracking-tight">Download the models.</h1>
-            <p className="mt-3 text-[15px] text-ink-2">One-time download from Hugging Face, verified by checksum. You can record right away; transcripts appear once the speech model is in.</p>
+            <p className="mt-3 text-[15px] text-ink-2">
+              One-time download from Hugging Face, verified by checksum. Start with the essentials ({fmtBytes(bytes(essentials))}) and record right away; the bigger models ({fmtBytes(bytes(later))}) finish in the background and Hark catches up on clean-up and summaries by itself.
+            </p>
             <Card className="mt-6 divide-y divide-line px-5">
               {needed.length === 0 && <div className="py-6"><Spinner /></div>}
-              {needed.map((m) => (
+              {[...essentials, ...later].map((m) => (
                 <div key={m.spec.id} className="flex items-center gap-4 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-medium">{m.spec.name} <span className="text-ink-3">{fmtBytes(m.spec.size_bytes)}</span></div>
-                    <div className="text-[12px] text-ink-3">{m.roles.map((r) => ({ live: "live captions", quality: "final transcript", llm: "summaries & chat" })[r]).join(", ")}</div>
+                    <div className="text-[12px] text-ink-3">{isEssential(m) ? "Essential: " : "Later: "}{m.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")}</div>
                     {m.downloading && (
                       <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-line">
                         <div className="h-full bg-ink transition-[width]" style={{ width: `${Math.round((progress[m.spec.id] ?? 0) * 100)}%` }} />
@@ -159,13 +169,26 @@ export function Onboarding() {
             <div className="mt-6 flex gap-2">
               <Button variant="ghost" size="lg" onClick={() => setStep(1)}>Back</Button>
               {!allPresent && !needed.some((m) => m.downloading) && (
-                <Button variant="outline" size="lg" onClick={() => needed.filter((m) => !m.present).forEach((m) => void cmd.downloadModel(m.spec.id).catch(() => {}))}>
+                <Button variant="outline" size="lg" onClick={() => startAll(needed)}>
                   Download all
                 </Button>
               )}
-              <Button variant="primary" size="lg" onClick={() => void finish()}>
-                {allPresent ? "Open Hark" : "Skip for now"} <ArrowRight size={16} />
-              </Button>
+              {!essentialsPresent && !essentials.some((m) => m.downloading) ? (
+                <Button variant="primary" size="lg" onClick={() => startAll(essentials)}>
+                  <Download size={16} /> Start with essentials
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={() => {
+                    if (essentialsPresent) startAll(later);
+                    void finish();
+                  }}
+                >
+                  {allPresent ? "Open Hark" : essentialsPresent ? "Open Hark, finish the rest in the background" : "Skip for now"} <ArrowRight size={16} />
+                </Button>
+              )}
             </div>
           </div>
         )}

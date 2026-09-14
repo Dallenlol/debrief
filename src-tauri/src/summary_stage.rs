@@ -16,6 +16,7 @@ pub fn run_summary(app: &AppHandle, meeting_id: &str, template_id: Option<&str>)
     emit("summary", 0.9, None);
     let Some(backend) = state.llm() else {
         notice(app, "info", "Summary skipped: no language model available. Download one in Settings or connect an endpoint.".into());
+        let _ = state.store.set_meeting_error(meeting_id, Some(crate::pipeline::NO_LLM));
         emit("done", 1.0, None);
         return;
     };

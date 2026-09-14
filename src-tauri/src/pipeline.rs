@@ -149,6 +149,7 @@ pub fn run_cleanup(app: &AppHandle, meeting_id: &str) {
     let state = app.state::<AppState>();
     let Some(backend) = state.llm() else {
         notice(app, "info", "Transcript cleanup skipped: no language model available. Download one in Settings or point Hark at an endpoint.".into());
+        let _ = state.store.set_meeting_error(meeting_id, Some(NO_LLM));
         return;
     };
     let stored = match state.store.segments(meeting_id) {
@@ -274,6 +275,53 @@ pub fn reembed(app: &AppHandle, meeting_id: &str) -> Result<usize, String> {
     let r = crate::embed_stage::embed_meeting(app, meeting_id);
     emit("done", 1.0, r.as_ref().err().cloned());
     r
+}
+
+/// Error text stored when the AI passes were skipped for lack of a language model.
+pub const NO_LLM: &str = "no-llm: clean-up and summary will run once the language model is downloaded";
+
+/// Run clean-up and summary for every meeting that was skipped for lack of a
+/// language model (called when one finishes downloading).
+pub fn run_deferred_ai(app: AppHandle) {
+    std::thread::spawn(move || {
+        let state = app.state::<AppState>();
+        let settings = state.settings.read().clone();
+        let todo: Vec<String> = state
+            .store
+            .list_meetings()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|m| m.error.as_deref().is_some_and(|e| e.starts_with("no-llm:")))
+            .map(|m| m.id)
+            .collect();
+        if todo.is_empty() {
+            return;
+        }
+        notice(&app, "info", format!("Language model ready: finishing {} meeting(s).", todo.len()));
+        for id in todo {
+            let _ = state.store.set_meeting_error(&id, None);
+            if settings.cleanup_enabled {
+                run_cleanup(&app, &id);
+            }
+            let _ = state.store.rebuild_chunks(&id);
+            let _ = crate::embed_stage::embed_meeting(&app, &id);
+            if settings.summary_enabled {
+                run_summary(&app, &id, None);
+            }
+        }
+    });
+}
+
+/// Embed every meeting that has chunks but no vectors yet.
+pub fn run_deferred_embeddings(app: AppHandle) {
+    std::thread::spawn(move || {
+        let state = app.state::<AppState>();
+        for m in state.store.list_meetings().unwrap_or_default() {
+            if m.status == MeetingStatus::Ready && !state.store.has_chunk_vectors(&m.id).unwrap_or(true) {
+                let _ = crate::embed_stage::embed_meeting(&app, &m.id);
+            }
+        }
+    });
 }
 
 fn fail(state: &AppState, meeting: &mut Meeting, emit: &dyn Fn(&'static str, f32, Option<String>), err: String) {

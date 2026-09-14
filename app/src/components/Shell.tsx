@@ -11,6 +11,16 @@ import { UpdateBanner } from "./UpdateBanner";
 export function Shell() {
   const [rec, setRec] = useState<RecordingState>({ state: "idle", meeting_id: null, elapsed_ms: 0 });
   const [hotkey, setHotkey] = useState("Ctrl+Shift+R");
+  const [downloads, setDownloads] = useState<Record<string, { done: number; total: number }>>({});
+
+  useEffect(() => subscribe("model_progress", (p) => {
+    setDownloads((d) => {
+      const next = { ...d };
+      if (p.status === "downloading") next[p.id] = { done: p.done, total: p.total };
+      else delete next[p.id];
+      return next;
+    });
+  }), []);
 
   useEffect(() => {
     void cmd.recordingStatus().then(setRec);
@@ -79,6 +89,7 @@ export function Shell() {
       </main>
       <Toasts />
       <UpdateBanner />
+      {Object.keys(downloads).length > 0 && <DownloadPill downloads={downloads} />}
     </div>
   );
 }
@@ -97,6 +108,22 @@ function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label
     >
       {icon}
       {label}
+    </NavLink>
+  );
+}
+
+function DownloadPill({ downloads }: { downloads: Record<string, { done: number; total: number }> }) {
+  const ids = Object.keys(downloads);
+  const done = ids.reduce((n, id) => n + downloads[id].done, 0);
+  const total = ids.reduce((n, id) => n + downloads[id].total, 0);
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return (
+    <NavLink to="/settings" className="fixed bottom-4 left-4 z-40 flex w-[200px] flex-col gap-1 rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] shadow-float hover:bg-canvas-2" title={ids.join(", ")}>
+      <span className="flex items-center justify-between text-ink-2">
+        <span>Downloading {ids.length === 1 ? "model" : `${ids.length} models`}</span>
+        <span className="font-mono text-ink-3">{pct}%</span>
+      </span>
+      <span className="h-1 w-full overflow-hidden rounded-full bg-line"><span className="block h-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></span>
     </NavLink>
   );
 }

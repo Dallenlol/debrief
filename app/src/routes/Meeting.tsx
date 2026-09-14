@@ -229,7 +229,12 @@ export function MeetingPage() {
         </div>
       </header>
 
-      {(m.status === "failed" || m.error) && !processing && (
+      {m.error?.startsWith("no-llm:") && !processing && (
+        <div className="mb-5 flex items-center gap-3 rounded-lg border border-line bg-canvas-2 px-4 py-2.5 text-[13px] text-ink-2">
+          <Spinner className="h-3.5 w-3.5" /> Clean-up and summary will run automatically once the language model finishes downloading. <Link to="/settings" className="underline">Models</Link>
+        </div>
+      )}
+      {(m.status === "failed" || (m.error && !m.error.startsWith("no-llm:"))) && !processing && (
         <div className="mb-5 flex items-start gap-3 rounded-lg border border-ember/30 bg-ember-soft/40 px-4 py-3 text-[13px]">
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-ember" />
           <div className="min-w-0 flex-1">

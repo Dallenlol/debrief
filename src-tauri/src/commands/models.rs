@@ -52,6 +52,9 @@ pub fn list_models(state: State<AppState>) -> Vec<ModelRow> {
             if spec.id == llm {
                 roles.push("llm");
             }
+            if state.catalog.common_ids().iter().any(|c| c == &spec.id) {
+                roles.push(if spec.kind == hark_models::ModelKind::Embedding { "search" } else { "speakers" });
+            }
             ModelRow {
                 spec: spec.clone(),
                 present: hark_models::is_present(&dir, spec),
@@ -99,6 +102,11 @@ pub async fn download_model(app: AppHandle, id: String) -> CmdResult<()> {
                 events::MODEL_PROGRESS,
                 ModelProgressPayload { id, done: spec.size_bytes, total: spec.size_bytes, status: "done", error: None },
             );
+            if spec.kind == hark_models::ModelKind::Llm {
+                crate::pipeline::run_deferred_ai(app.clone());
+            } else if spec.kind == hark_models::ModelKind::Embedding {
+                crate::pipeline::run_deferred_embeddings(app.clone());
+            }
             Ok(())
         }
         Err(e) => {

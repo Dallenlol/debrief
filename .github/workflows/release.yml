@@ -56,9 +56,9 @@ jobs:
         run: choco install -y llvm
       - name: Install CUDA toolkit
         if: matrix.features == 'cuda'
-        uses: Jimver/cuda-toolkit@v0.2.19
+        uses: Jimver/cuda-toolkit@v0.2.36
         with:
-          cuda: "12.6.0"
+          cuda: "13.2.2"
           method: network
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]'
       - name: Register CUDA with Visual Studio's MSBuild

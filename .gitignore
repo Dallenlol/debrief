@@ -13,3 +13,7 @@ src-tauri/binaries/
 .cargo/config.toml
 src-tauri/resources/*
 !src-tauri/resources/README.txt
+site/dist/
+site/node_modules/
+.playwright-mcp/
+site/.astro/

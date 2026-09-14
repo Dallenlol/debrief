@@ -17,6 +17,7 @@ export function SettingsPage() {
   const [data, setData] = useState<{ data_dir: string; recordings_bytes: number; models_bytes: number } | null>(null);
   const [hotkeyDraft, setHotkeyDraft] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const [endpointTest, setEndpointTest] = useState<string | null>(null);
 
   const reloadModels = () => void cmd.listModels().then(setModels);
 
@@ -218,6 +219,53 @@ export function SettingsPage() {
               );
             })}
           </ul>
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle>AI assistant</SectionTitle>
+        <Card className="divide-y divide-line px-5">
+          <div className="py-4">
+            <span className="mb-2 block text-[12px] font-medium text-ink-2">Language model runs...</span>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ["bundled", "Inside Hark", "Built-in llama.cpp with the downloaded model. Nothing to install."],
+                ["openai", "On an endpoint I run", "Ollama, LM Studio or any OpenAI-compatible server on this machine or your network."],
+              ] as const).map(([v, title, body]) => (
+                <button
+                  key={v}
+                  onClick={() => void update({ llm_backend: v })}
+                  className={`focus-ring rounded-lg border p-3 text-left transition-colors ${s.llm_backend === v ? "border-ink bg-canvas shadow-card" : "border-line hover:bg-canvas-2"}`}
+                >
+                  <div className="text-[13px] font-semibold">{title}</div>
+                  <div className="text-[12px] text-ink-3">{body}</div>
+                </button>
+              ))}
+            </div>
+            {s.llm_backend === "openai" && (
+              <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
+                <Input value={s.llm_endpoint} placeholder="http://localhost:11434/v1" onChange={(e) => setS({ ...s, llm_endpoint: e.target.value })} onBlur={() => void update({ llm_endpoint: s.llm_endpoint })} className="font-mono text-[12px]" />
+                <Input value={s.llm_endpoint_model} placeholder="model name, e.g. qwen3:8b" onChange={(e) => setS({ ...s, llm_endpoint_model: e.target.value })} onBlur={() => void update({ llm_endpoint_model: s.llm_endpoint_model })} className="font-mono text-[12px]" />
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    setEndpointTest("Testing...");
+                    cmd.testLlmEndpoint(s.llm_endpoint, s.llm_api_key, s.llm_endpoint_model).then(
+                      (models) => setEndpointTest(models.includes(s.llm_endpoint_model) ? `OK, ${models.length} models, "${s.llm_endpoint_model}" found` : `Reachable, but "${s.llm_endpoint_model}" not in: ${models.slice(0, 6).join(", ")}`),
+                      (e) => setEndpointTest(`Failed: ${e}`),
+                    );
+                  }}
+                >
+                  Test
+                </Button>
+                <Input value={s.llm_api_key ?? ""} type="password" placeholder="API key (optional)" onChange={(e) => setS({ ...s, llm_api_key: e.target.value || null })} onBlur={() => void update({ llm_api_key: s.llm_api_key })} className="col-span-2 font-mono text-[12px]" />
+                {endpointTest && <div className="col-span-3 text-[12px] text-ink-2">{endpointTest}</div>}
+              </div>
+            )}
+          </div>
+          <Toggle label="Identify speakers" description="Who spoke when, plus voice memory so you only name someone once. Uses two small local models." checked={s.diarize_enabled} onChange={(v) => void update({ diarize_enabled: v })} />
+          <Toggle label="Clean up transcripts with AI" description="Fixes garbled words, broken English and filler. The raw transcript is always kept." checked={s.cleanup_enabled} onChange={(v) => void update({ cleanup_enabled: v })} />
         </Card>
       </section>
 

@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Player, type PlayerHandle } from "@/components/Player";
@@ -17,6 +17,8 @@ export function MeetingPage() {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [stage, setStage] = useState<string | null>(null);
+  const [view, setView] = useState<"clean" | "raw" | null>(null);
+  const [dismissed, setDismissed] = useState<string[]>([]);
   const player = useRef<PlayerHandle>(null);
 
   const load = useCallback(() => {
@@ -55,6 +57,18 @@ export function MeetingPage() {
 
   const m = detail.meeting;
   const processing = m.status === "processing" || stage !== null;
+  const hasClean = detail.segments.some((s) => s.clean_text);
+  const useClean = (view ?? "clean") === "clean" && hasClean;
+  const speakers = detail.speakers.filter((sp) => !dismissed.includes(sp.label));
+
+  const renameSpeaker = async (label: string, name: string) => {
+    await cmd.renameSpeaker(m.id, label, name);
+    load();
+  };
+  const acceptSuggestion = async (label: string) => {
+    await cmd.acceptSpeakerSuggestion(m.id, label);
+    load();
+  };
 
   const saveTitle = async () => {
     const next = title.trim();
@@ -108,8 +122,11 @@ export function MeetingPage() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => void cmd.retranscribe(m.id)} disabled={processing} title="Run transcription again">
+          <Button variant="ghost" size="sm" onClick={() => void cmd.retranscribe(m.id)} disabled={processing} title="Run transcription and speaker detection again">
             <RefreshCw size={14} /> Re-transcribe
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => void cmd.rerunCleanup(m.id)} disabled={processing || detail.segments.length === 0} title="Run the AI cleanup pass again">
+            <Sparkles size={14} /> Clean up
           </Button>
           <Button variant="danger" size="sm" onClick={() => void remove()}>
             <Trash2 size={14} /> Delete
@@ -135,7 +152,27 @@ export function MeetingPage() {
         </div>
 
         <div>
-          <SectionTitle hint={processing ? <span className="inline-flex items-center gap-2"><Spinner className="h-3 w-3" /> {stage ?? "processing"}</span> : `${detail.segments.length} segments`}>
+          <SectionTitle
+            hint={
+              processing ? (
+                <span className="inline-flex items-center gap-2"><Spinner className="h-3 w-3" /> {stage ?? "processing"}</span>
+              ) : hasClean ? (
+                <span className="inline-flex rounded-md bg-canvas-3 p-0.5 text-[11px] font-medium">
+                  {(["clean", "raw"] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setView(v)}
+                      className={`rounded px-2 py-0.5 capitalize ${useClean === (v === "clean") ? "bg-canvas text-ink shadow-card" : "text-ink-3"}`}
+                    >
+                      {v === "clean" ? "Cleaned" : "Raw"}
+                    </button>
+                  ))}
+                </span>
+              ) : (
+                `${detail.segments.length} segments`
+              )
+            }
+          >
             Transcript
           </SectionTitle>
           {detail.segments.length === 0 && processing ? (
@@ -145,7 +182,16 @@ export function MeetingPage() {
               No transcript. Download a speech model in <Link to="/settings" className="underline">Settings</Link>, then Re-transcribe.
             </p>
           ) : (
-            <Transcript segments={detail.segments} currentMs={currentMs} onSeek={(ms) => player.current?.seek(ms)} />
+            <Transcript
+              segments={detail.segments}
+              currentMs={currentMs}
+              onSeek={(ms) => player.current?.seek(ms)}
+              useClean={useClean}
+              speakers={speakers}
+              onRenameSpeaker={renameSpeaker}
+              onAcceptSuggestion={acceptSuggestion}
+              onDismissSuggestion={(label) => setDismissed((d) => [...d, label])}
+            />
           )}
         </div>
       </div>

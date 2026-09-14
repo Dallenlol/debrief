@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { fmtStamp } from "@/lib/format";
-import type { Segment } from "@/lib/ipc";
+import type { MeetingSpeaker, Segment } from "@/lib/ipc";
+import { SpeakerChip } from "./SpeakerChip";
 
 export interface TranscriptProps {
   segments: Pick<Segment, "id" | "start_ms" | "end_ms" | "speaker" | "text" | "clean_text">[];
@@ -10,11 +11,26 @@ export interface TranscriptProps {
   useClean?: boolean;
   autoScroll?: boolean;
   className?: string;
+  speakers?: MeetingSpeaker[];
+  onRenameSpeaker?: (label: string, name: string) => void | Promise<void>;
+  onAcceptSuggestion?: (label: string) => void | Promise<void>;
+  onDismissSuggestion?: (label: string) => void;
 }
 
 const SPEAKER_COLORS = ["text-ember", "text-moss", "text-amber", "text-ink-2"];
 
-export function Transcript({ segments, currentMs, onSeek, useClean = false, autoScroll = true, className }: TranscriptProps) {
+export function Transcript({
+  segments,
+  currentMs,
+  onSeek,
+  useClean = false,
+  autoScroll = true,
+  className,
+  speakers = [],
+  onRenameSpeaker,
+  onAcceptSuggestion,
+  onDismissSuggestion,
+}: TranscriptProps) {
   const activeIdx = useMemo(() => {
     let idx = -1;
     for (let i = 0; i < segments.length; i++) {
@@ -32,6 +48,14 @@ export function Transcript({ segments, currentMs, onSeek, useClean = false, auto
     }
     return map;
   }, [segments]);
+
+  const suggestions = useMemo(() => {
+    const m = new Map<string, { name: string; score: number }>();
+    for (const sp of speakers) {
+      if (sp.suggested_name && sp.suggested_score != null && !sp.speaker_id) m.set(sp.label, { name: sp.suggested_name, score: sp.suggested_score });
+    }
+    return m;
+  }, [speakers]);
 
   const activeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
@@ -52,10 +76,24 @@ export function Transcript({ segments, currentMs, onSeek, useClean = false, auto
         lastSpeaker = s.speaker;
         const active = i === activeIdx;
         const color = s.speaker ? SPEAKER_COLORS[(speakerIndex.get(s.speaker) ?? 0) % SPEAKER_COLORS.length] : "text-ink-3";
+        const cleaned = useClean && !!s.clean_text && s.clean_text !== s.text;
         const text = useClean && s.clean_text ? s.clean_text : s.text;
         return (
           <div key={s.id} className={cn(showSpeaker && i > 0 && "mt-3")}>
-            {showSpeaker && s.speaker && <div className={cn("mb-0.5 text-[12px] font-semibold", color)}>{s.speaker}</div>}
+            {showSpeaker && s.speaker && (
+              onRenameSpeaker ? (
+                <SpeakerChip
+                  label={s.speaker}
+                  colorClass={color}
+                  suggestion={suggestions.get(s.speaker) ?? null}
+                  onRename={(name) => onRenameSpeaker(s.speaker!, name)}
+                  onAcceptSuggestion={() => onAcceptSuggestion?.(s.speaker!)}
+                  onDismissSuggestion={() => onDismissSuggestion?.(s.speaker!)}
+                />
+              ) : (
+                <div className={cn("mb-0.5 text-[12px] font-semibold", color)}>{s.speaker}</div>
+              )
+            )}
             <button
               type="button"
               ref={active ? activeRef : null}
@@ -69,7 +107,12 @@ export function Transcript({ segments, currentMs, onSeek, useClean = false, auto
               <span className={cn("mt-0.5 w-12 shrink-0 font-mono text-[11px] tabular-nums", active ? "text-ember" : "text-ink-3")}>
                 {fmtStamp(s.start_ms)}
               </span>
-              <span className={cn("text-[14.5px] leading-6", active ? "text-ink" : "text-ink/90")}>{text}</span>
+              <span
+                className={cn("text-[14.5px] leading-6", active ? "text-ink" : "text-ink/90", cleaned && "decoration-line-2 decoration-dotted underline-offset-4 hover:underline")}
+                title={cleaned ? `Original: ${s.text}` : undefined}
+              >
+                {text}
+              </span>
             </button>
           </div>
         );

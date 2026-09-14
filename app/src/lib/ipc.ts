@@ -28,11 +28,26 @@ export interface Segment {
   clean_text: string | null;
 }
 
+export interface MeetingSpeaker {
+  meeting_id: string;
+  label: string;
+  speaker_id: string | null;
+  suggested_id: string | null;
+  suggested_name: string | null;
+  suggested_score: number | null;
+}
+
+export interface Speaker {
+  id: string;
+  name: string;
+}
+
 export interface MeetingDetail {
   meeting: Meeting;
   segments: Segment[];
   media: { audio: string; video: string | null };
   highlights: number[];
+  speakers: MeetingSpeaker[];
 }
 
 export interface SearchHit {
@@ -67,6 +82,12 @@ export interface Settings {
   never_apps: string[];
   popup_timeout_secs: number;
   close_to_tray: boolean;
+  llm_backend: "bundled" | "openai";
+  llm_endpoint: string;
+  llm_endpoint_model: string;
+  llm_api_key: string | null;
+  cleanup_enabled: boolean;
+  diarize_enabled: boolean;
 }
 
 export interface AudioDevice {
@@ -142,6 +163,15 @@ export const cmd = {
   downloadModel: (id: string) => invoke<void>("download_model", { id }),
   cancelDownload: (id: string) => invoke<void>("cancel_download", { id }),
   removeModel: (id: string) => invoke<void>("remove_model", { id }),
+
+  meetingSpeakers: (id: string) => invoke<MeetingSpeaker[]>("meeting_speakers", { id }),
+  renameSpeaker: (id: string, label: string, name: string) => invoke<Speaker>("rename_speaker", { id, label, name }),
+  acceptSpeakerSuggestion: (id: string, label: string) => invoke<Speaker>("accept_speaker_suggestion", { id, label }),
+  listKnownSpeakers: () => invoke<Speaker[]>("list_known_speakers"),
+  deleteKnownSpeaker: (id: string) => invoke<void>("delete_known_speaker", { id }),
+  rerunCleanup: (id: string) => invoke<void>("rerun_cleanup", { id }),
+  testLlmEndpoint: (url: string, apiKey: string | null, model: string) =>
+    invoke<string[]>("test_llm_endpoint", { url, apiKey, model }),
 
   listAudioDevices: () => invoke<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>("list_audio_devices"),
   sampleLevels: (mic: string | null, loopback: string | null) =>

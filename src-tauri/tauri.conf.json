@@ -19,6 +19,36 @@
         "minWidth": 900,
         "minHeight": 600,
         "resizable": true
+      },
+      {
+        "label": "popup",
+        "title": "Hark",
+        "url": "index.html?window=popup",
+        "width": 380,
+        "height": 168,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": true
+      },
+      {
+        "label": "recordbar",
+        "title": "Hark recording",
+        "url": "index.html?window=recordbar",
+        "width": 560,
+        "height": 72,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": true
       }
     ],
     "security": {
@@ -31,7 +61,8 @@
           "$APPDATA/**"
         ]
       }
-    }
+    },
+    "withGlobalTauri": false
   },
   "bundle": {
     "active": true,
@@ -46,6 +77,12 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "externalBin": [
+      "binaries/ffmpeg"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Local-only meeting recorder with private AI",
+    "longDescription": "Hark records your meetings locally, transcribes them with speaker labels and lets you chat with a private, on-device AI about them. Nothing leaves your computer."
   }
 }

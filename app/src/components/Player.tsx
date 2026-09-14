@@ -22,7 +22,7 @@ export const Player = forwardRef<PlayerHandle, PlayerProps>(function Player({ au
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const src = convertFileSrc(video ?? audio);
+  const src = (video ?? audio) ? convertFileSrc(video ?? audio) : "";
 
   useImperativeHandle(ref, () => ({
     seek(ms) {

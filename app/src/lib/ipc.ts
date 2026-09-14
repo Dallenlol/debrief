@@ -1,7 +1,12 @@
 // Typed bridge to the Rust side. Every command and event lives here so the
 // rest of the UI never touches Tauri APIs directly.
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event";
+import { isMock, mockInvoke } from "./mock";
+
+// Outside Tauri (plain `pnpm dev` in a browser) fall back to sample data so the UI can be developed and screenshotted.
+const invoke: typeof tauriInvoke = isMock ? (mockInvoke as typeof tauriInvoke) : tauriInvoke;
+const listen: typeof tauriListen = isMock ? (async () => () => {}) as typeof tauriListen : tauriListen;
 
 export type MeetingStatus = "recording" | "processing" | "ready" | "failed";
 

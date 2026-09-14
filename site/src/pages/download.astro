@@ -1,0 +1,46 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../site";
+---
+
+<Base title="Download" description="Download Hark for Windows (CPU or NVIDIA CUDA) and macOS (Apple Silicon or Intel). Free, open-source, offline meeting recorder with local AI transcription and summaries.">
+  <section style="padding: 56px 0 24px;">
+    <p class="eyebrow">Download</p>
+    <h1>Get Hark {SITE.version}</h1>
+    <p class="muted" style="max-width: 640px; font-size: 18px;">Pick the build for your machine. All of them are free, open source and identical in features; the GPU builds are just faster.</p>
+  </section>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Windows, NVIDIA GPU</h3>
+      <p class="muted">Uses CUDA for fast transcription and summaries. Needs a GeForce GTX 10-series or newer with 6 GB+ VRAM and a recent driver.</p>
+      <a class="btn primary" href={SITE.releases}>Download CUDA installer</a>
+    </div>
+    <div class="card">
+      <h3>Windows, any PC</h3>
+      <p class="muted">Runs on the CPU. Works on any 64-bit Windows 10/11 machine with 8 GB of RAM. Slower, but fully featured.</p>
+      <a class="btn primary" href={SITE.releases}>Download CPU installer</a>
+    </div>
+    <div class="card">
+      <h3>macOS, Apple Silicon</h3>
+      <p class="muted">M1 or later, uses Metal. System-audio capture needs macOS 14.6+; older versions record the mic only.</p>
+      <a class="btn primary" href={SITE.releases}>Download for Apple Silicon</a>
+    </div>
+    <div class="card">
+      <h3>macOS, Intel</h3>
+      <p class="muted">For Intel Macs on macOS 13 or later. CPU inference; the CPU tiers of models are selected automatically.</p>
+      <a class="btn primary" href={SITE.releases}>Download for Intel</a>
+    </div>
+  </div>
+
+  <section style="margin-top: 56px; max-width: 720px;">
+    <h2>After installing</h2>
+    <ol class="muted" style="line-height: 1.8;">
+      <li>Open Hark. It checks your mic and system audio, then suggests model sizes for your hardware.</li>
+      <li>Download the models once (from Hugging Face, checksum-verified, 1 to 7 GB depending on tier).</li>
+      <li>Join a call. When the popup appears, click <b>Record</b>. Or press <code>Ctrl/Cmd+Shift+R</code> anytime.</li>
+    </ol>
+    <h2 style="margin-top: 40px;">Unsigned builds</h2>
+    <p class="muted">Hark's installers are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper will warn on first launch. On Windows choose "More info, Run anyway"; on macOS right-click the app and choose Open. Every release lists SHA-256 checksums, and you can always <a href={`${SITE.repo}#building-from-source`}>build from source</a>.</p>
+  </section>
+</Base>

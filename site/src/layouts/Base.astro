@@ -1,0 +1,131 @@
+---
+import "@fontsource-variable/manrope";
+import "@fontsource/instrument-serif";
+import { SITE } from "../site";
+
+interface Props {
+  title: string;
+  description: string;
+  /** Extra JSON-LD objects to embed. */
+  jsonLd?: unknown[];
+  ogType?: string;
+}
+const { title, description, jsonLd = [], ogType = "website" } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+const fullTitle = title === SITE.name ? `${SITE.name} - ${SITE.tagline}` : `${title} | ${SITE.name}`;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const og = `${SITE.url}og.png`;
+const softwareLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Hark",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Windows, macOS",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  license: "https://opensource.org/licenses/MIT",
+  softwareVersion: SITE.version,
+  url: SITE.url,
+  downloadUrl: SITE.releases,
+  description: SITE.description,
+  featureList: [
+    "Local meeting recording (mic + system audio + screen)",
+    "Offline transcription with speaker identification",
+    "On-device AI summaries and chat",
+    "No cloud, no account, no bot",
+  ],
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={`${base}/favicon.svg`} type="image/svg+xml" />
+    <meta name="theme-color" content="#fbf9f5" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content="Hark" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={og} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={og} />
+    <script type="application/ld+json" set:html={JSON.stringify(softwareLd)} />
+    {jsonLd.map((o) => <script type="application/ld+json" set:html={JSON.stringify(o)} />)}
+    <style is:global>
+      :root {
+        --canvas: #fbf9f5; --canvas-2: #f3efe8; --ink: #221f1c; --ink-2: #6b655f; --ink-3: #9a938b;
+        --line: #e8e3dc; --ember: #d9542d; --ember-soft: #fbe6de; --moss: #3f7d5b; --moss-soft: #e4f0e8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --canvas: #1b1917; --canvas-2: #23201d; --ink: #f1ede7; --ink-2: #a49c93; --ink-3: #7a736b; --line: #35302c; --ember: #e8673f; --ember-soft: #3a2620; --moss: #7fc39d; --moss-soft: #23352b; }
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: var(--canvas); color: var(--ink); font: 16px/1.6 "Manrope Variable", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+      a { color: inherit; }
+      h1, h2, h3 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; letter-spacing: -0.01em; line-height: 1.1; margin: 0 0 .4em; }
+      h1 { font-size: clamp(40px, 7vw, 72px); }
+      h2 { font-size: clamp(28px, 4vw, 40px); }
+      h3 { font-size: 22px; }
+      p { margin: 0 0 1em; }
+      .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+      .btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 10px; font-weight: 600; text-decoration: none; font-size: 15px; }
+      .btn.primary { background: var(--ink); color: var(--canvas); }
+      .btn.ember { background: var(--ember); color: #fff; }
+      .btn.ghost { border: 1px solid var(--line); }
+      .muted { color: var(--ink-2); }
+      .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+      nav.top { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+      nav.top .brand { display: flex; align-items: center; gap: 10px; font-family: "Instrument Serif", serif; font-size: 26px; text-decoration: none; }
+      nav.top .brand span.mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--ink); color: var(--canvas); }
+      nav.top ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; font-size: 14px; }
+      nav.top ul a { text-decoration: none; color: var(--ink-2); }
+      nav.top ul a:hover { color: var(--ink); }
+      footer { border-top: 1px solid var(--line); margin-top: 96px; padding: 32px 0 48px; color: var(--ink-2); font-size: 14px; }
+      footer .cols { display: flex; flex-wrap: wrap; gap: 32px; justify-content: space-between; }
+      .card { border: 1px solid var(--line); border-radius: 14px; padding: 22px; background: var(--canvas); }
+      .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+      table { width: 100%; border-collapse: collapse; font-size: 15px; }
+      th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+      .yes { color: var(--moss); font-weight: 600; } .no { color: var(--ink-3); }
+      code { font-family: ui-monospace, monospace; font-size: 13px; background: var(--canvas-2); padding: 2px 6px; border-radius: 5px; }
+      details { border-bottom: 1px solid var(--line); padding: 14px 0; }
+      summary { cursor: pointer; font-weight: 600; }
+      @media (max-width: 640px) { nav.top ul { gap: 14px; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <nav class="top" aria-label="Main">
+        <a class="brand" href={`${base}/`}>
+          <span class="mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 12v2M8 8v8M12 5v14M16 8v8M20 11v3" /></svg></span>
+          Hark
+        </a>
+        <ul>
+          <li><a href={`${base}/download/`}>Download</a></li>
+          <li><a href={`${base}/compare/`}>vs Fathom</a></li>
+          <li><a href={`${base}/privacy/`}>Privacy</a></li>
+          <li><a href={`${base}/faq/`}>FAQ</a></li>
+          <li><a href={SITE.repo}>GitHub</a></li>
+        </ul>
+      </nav>
+      <slot />
+      <footer>
+        <div class="cols">
+          <div>Hark is free and open source (MIT). No accounts, no telemetry, no cloud.</div>
+          <div>
+            <a href={SITE.repo}>Source</a> &middot; <a href={`${SITE.repo}/issues`}>Issues</a> &middot; <a href={`${SITE.repo}/blob/main/CHANGELOG.md`}>Changelog</a> &middot; <a href={`${SITE.repo}/blob/main/docs/install.md`}>Docs</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

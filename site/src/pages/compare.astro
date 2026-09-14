@@ -1,0 +1,45 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../site";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const rows: [string, string, string, string, string][] = [
+  ["Price", "Free, MIT open source", "Free tier; paid plans for teams and integrations", "Free tier with minute limits; paid plans", "Free tier with limits; paid plans"],
+  ["Where recordings live", "Your computer only", "Their cloud", "Their cloud", "Their cloud"],
+  ["How it captures", "Records mic + system audio on your PC", "Bot joins the call", "Bot joins the call", "Bot joins the call"],
+  ["Visible to other participants", "No", "Yes (bot in participant list)", "Yes", "Yes"],
+  ["Works offline", "Yes", "No", "No", "No"],
+  ["Account required", "No", "Yes", "Yes", "Yes"],
+  ["Transcription", "whisper.cpp on-device (large-v3-turbo on GPU)", "Cloud", "Cloud", "Cloud"],
+  ["Speaker identification", "On-device, with confirmable voice memory", "Yes", "Yes", "Yes"],
+  ["AI summaries", "On-device (Qwen3) from editable templates", "Cloud, templates on paid plans", "Cloud", "Cloud"],
+  ["Ask questions about meetings", "On-device, across your library, timestamp citations", "Cloud", "Cloud", "Cloud"],
+  ["Screen / video recording", "Optional", "Yes", "No", "No"],
+  ["Sharing", "Links on your network, exportable bundles and web pages", "Cloud links", "Cloud links", "Cloud links"],
+  ["Bring your own model", "Yes (Ollama, LM Studio, any OpenAI-compatible server)", "No", "No", "No"],
+  ["Platforms", "Windows, macOS", "Windows, macOS, web", "Web, iOS, Android", "Web, mobile"],
+];
+---
+
+<Base title="Hark vs Fathom, Otter and Fireflies" description="How Hark, the open-source offline meeting recorder, compares with Fathom, Otter.ai and Fireflies.ai on privacy, price, bots, transcription, speaker identification and AI summaries.">
+  <section style="padding: 56px 0 24px;">
+    <p class="eyebrow">Comparison</p>
+    <h1>Hark vs Fathom, Otter and Fireflies</h1>
+    <p class="muted" style="max-width: 680px; font-size: 18px;">The cloud recorders are good products. They also hold every word of every meeting you've ever had. Hark exists for people who want the same features without that trade.</p>
+  </section>
+
+  <table>
+    <thead><tr><th></th><th>Hark</th><th>Fathom</th><th>Otter.ai</th><th>Fireflies.ai</th></tr></thead>
+    <tbody>
+      {rows.map(([k, a, b, c, d]) => <tr><td><b>{k}</b></td><td class="yes">{a}</td><td class="muted">{b}</td><td class="muted">{c}</td><td class="muted">{d}</td></tr>)}
+    </tbody>
+  </table>
+  <p class="muted" style="font-size: 13px; margin-top: 10px;">Competitor details summarised from their public pages as of September 2026. Corrections welcome on <a href={`${SITE.repo}/issues`}>GitHub</a>.</p>
+
+  <section style="margin-top: 56px; max-width: 720px;">
+    <h2>When Hark is the wrong choice</h2>
+    <p class="muted">If you need a bot to record meetings you don't attend, a mobile app, or transcripts shared to a whole company automatically, a cloud service is a better fit today. Hark is for the meetings you're in, on the computer you're using.</p>
+    <h2 style="margin-top: 40px;">When Hark is the right choice</h2>
+    <p class="muted">Client calls under NDA. Medical, legal and HR conversations. Anyone who has read a meeting-bot privacy policy all the way to the end. Anyone who wants the recorder to still work in five years without a subscription.</p>
+    <a class="btn ember" href={`${base}/download/`} style="margin-top: 8px;">Download Hark</a>
+  </section>
+</Base>

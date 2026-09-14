@@ -1,0 +1,27 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="Privacy" description="Hark's privacy model: no cloud, no account, no telemetry, no bot. Everything, including AI transcription and summaries, runs on your own computer.">
+  <section style="padding: 56px 0 24px; max-width: 720px;">
+    <p class="eyebrow">Privacy</p>
+    <h1>Built so you never have to trust us.</h1>
+    <p class="muted" style="font-size: 18px;">Hark has no servers, so there is nothing to leak, subpoena, train on, or breach.</p>
+    <h2 style="margin-top: 40px;">What leaves your computer</h2>
+    <ul class="muted" style="line-height: 1.8;">
+      <li><b>Model downloads</b> from Hugging Face and GitHub, when you ask for them, verified by SHA-256.</li>
+      <li><b>Nothing else</b>, unless you configure your own model endpoint (Ollama, LM Studio). Then transcript text goes to that server, which is yours.</li>
+    </ul>
+    <h2 style="margin-top: 40px;">What Hark never does</h2>
+    <ul class="muted" style="line-height: 1.8;">
+      <li>No account, sign-in, or license check.</li>
+      <li>No telemetry, analytics, or crash reports.</li>
+      <li>No bot in your meetings; other participants see nothing.</li>
+      <li>No automatic recording, naming, or sharing. Every one of those needs a click.</li>
+    </ul>
+    <h2 style="margin-top: 40px;">Share links</h2>
+    <p class="muted">When you create a share link, Hark serves that one recording from your computer to devices on the same network, only while Hark is open and the link is enabled. Links are 128-bit random tokens. Disable or delete them from the meeting or from Settings.</p>
+    <h2 style="margin-top: 40px;">Consent</h2>
+    <p class="muted">Recording other people may require their consent where you live. Hark makes it easy to record properly, and it is your responsibility to do so.</p>
+  </section>
+</Base>

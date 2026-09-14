@@ -1,0 +1,91 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../site";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const faq = [
+  ["Is Hark really free?", "Yes. Hark is open source under the MIT license. There are no plans, seats, or limits."],
+  ["Does it upload my meetings anywhere?", "No. Recording, transcription, speaker identification, summaries and chat all run on your computer. The only downloads are the AI models themselves."],
+  ["Does a bot join my calls?", "No. Hark records what your computer already hears and shows, so there is nothing for other participants to see in the meeting."],
+  ["Which meeting apps work?", "Zoom, Microsoft Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime and GoToMeeting are detected by name. Anything else is caught by audio activity, and you can always start recording manually."],
+  ["What hardware do I need?", "Any 64-bit Windows 10/11 or macOS 13+ machine with 8 GB of RAM. A GPU (NVIDIA, or Apple Silicon) makes transcription and summaries much faster."],
+];
+const faqLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faq.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+};
+---
+
+<Base title={SITE.name} description={SITE.description} jsonLd={[faqLd]}>
+  <section style="padding: 72px 0 40px;">
+    <p class="eyebrow">Open-source meeting recorder for Windows and macOS</p>
+    <h1 style="max-width: 820px;">Record every meeting. Keep every word on your own computer.</h1>
+    <p class="muted" style="max-width: 640px; font-size: 19px;">
+      Hark notices when you're on a call and offers to record. It transcribes with speaker names, writes the summary, and answers questions about any meeting, with an AI that runs on your machine. No bot. No cloud. No account. Free, forever.
+    </p>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top: 8px;">
+      <a class="btn ember" href={`${base}/download/`}>Download Hark</a>
+      <a class="btn ghost" href={SITE.repo}>View on GitHub</a>
+    </div>
+    <p class="muted" style="font-size: 13px; margin-top: 14px;">Windows (CPU or NVIDIA CUDA) &middot; macOS (Apple Silicon or Intel) &middot; MIT license</p>
+  </section>
+
+  <section class="card" style="padding: 0; overflow: hidden; margin: 24px 0 64px;">
+    <img src={`${base}/screenshot-meeting.png`} alt="Hark meeting page: player, speaker-labelled transcript, summary and chat tabs" width="1600" height="1000" loading="eager" style="display:block; width:100%; height:auto;" />
+  </section>
+
+  <section style="margin-bottom: 72px;">
+    <p class="eyebrow">Why people switch from Fathom, Otter and Fireflies</p>
+    <h2>Everything they do. Nothing they know.</h2>
+    <div class="grid" style="margin-top: 24px;">
+      <div class="card"><h3>Manual by design</h3><p class="muted">Detection only shows a popup. Nothing records, no speaker gets named, nothing gets shared without your click.</p></div>
+      <div class="card"><h3>Speaker names that stick</h3><p class="muted">Hark tells voices apart, spots which one is you, and after you name someone once it recognises them next time and asks you to confirm.</p></div>
+      <div class="card"><h3>Fixes bad audio</h3><p class="muted">A local language model repairs garbled words, broken English and filler from bad mics and worse Wi-Fi. The raw transcript is always one click away.</p></div>
+      <div class="card"><h3>Summaries from your templates</h3><p class="muted">Sales call, discovery, 1:1, standup, interview, or write your own. Regenerate any meeting with any template.</p></div>
+      <div class="card"><h3>Ask Hark</h3><p class="muted">"What did we decide about pricing?" across one meeting or your whole library, answered with timestamps you can click to hear the moment.</p></div>
+      <div class="card"><h3>Yours to move</h3><p class="muted">Folders, tags, search, clips, share links on your network, and <code>.hark</code> bundles you can import on another computer.</p></div>
+    </div>
+  </section>
+
+  <section style="margin-bottom: 72px;">
+    <p class="eyebrow">How it works</p>
+    <h2>Three things happen, all on your machine.</h2>
+    <div class="grid" style="margin-top: 24px;">
+      <div><h3>1. Record</h3><p class="muted">Your microphone and what you hear are captured as separate tracks, plus optional screen video, written to disk continuously.</p></div>
+      <div><h3>2. Transcribe</h3><p class="muted">whisper.cpp turns speech into text with live captions during the call and a high-quality pass after. pyannote and TitaNet identify who spoke.</p></div>
+      <div><h3>3. Understand</h3><p class="muted">llama.cpp runs Qwen3 (1.7B to 8B depending on your hardware) for cleanup, summaries and chat. Or point Hark at Ollama or LM Studio.</p></div>
+    </div>
+  </section>
+
+  <section style="margin-bottom: 72px;">
+    <p class="eyebrow">Compare</p>
+    <h2>Hark vs the meeting bots</h2>
+    <table>
+      <thead><tr><th></th><th>Hark</th><th>Fathom</th><th>Otter</th><th>Fireflies</th></tr></thead>
+      <tbody>
+        <tr><td>Price</td><td class="yes">Free, open source</td><td>Free tier + paid</td><td>Free tier + paid</td><td>Free tier + paid</td></tr>
+        <tr><td>Recordings stay on your device</td><td class="yes">Yes</td><td class="no">Cloud</td><td class="no">Cloud</td><td class="no">Cloud</td></tr>
+        <tr><td>Bot joins the meeting</td><td class="yes">Never</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Works offline</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+        <tr><td>Speaker identification and memory</td><td class="yes">Yes, on-device</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>AI summaries and chat</td><td class="yes">Yes, on-device</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Screen recording</td><td class="yes">Optional</td><td>Yes</td><td class="no">No</td><td class="no">No</td></tr>
+        <tr><td>Account required</td><td class="yes">No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="font-size: 13px; margin-top: 10px;">Competitor details as of September 2026; see their sites for current plans. <a href={`${base}/compare/`}>Full comparison</a>.</p>
+  </section>
+
+  <section style="margin-bottom: 40px;">
+    <p class="eyebrow">Questions</p>
+    <h2>FAQ</h2>
+    {faq.map(([q, a]) => <details><summary>{q}</summary><p class="muted" style="margin-top: 8px;">{a}</p></details>)}
+    <p style="margin-top: 16px;"><a href={`${base}/faq/`}>More questions</a></p>
+  </section>
+
+  <section class="card" style="text-align:center; padding: 48px 24px;">
+    <h2>Your meetings. Your computer. Your call.</h2>
+    <p class="muted">Install in a minute. Delete in a second. Nothing left behind anywhere else.</p>
+    <a class="btn ember" href={`${base}/download/`}>Download Hark {SITE.version}</a>
+  </section>
+</Base>

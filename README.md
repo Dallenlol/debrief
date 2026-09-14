@@ -6,6 +6,8 @@ Hark notices when you're in a call, offers a **Record** button (it never records
 
 > Think of it as an open-source, offline alternative to Fathom, Otter and Fireflies.
 
+![Hark meeting page: speaker-labelled transcript with voice-memory suggestion, summary and chat tabs](docs/img/meeting.png)
+
 ## What it does
 
 - **Notices calls** in Zoom, Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime, GoToMeeting (and anything else, via audio activity) and shows a small **Record?** popup. A global hotkey and tray menu work anytime.
@@ -16,6 +18,8 @@ Hark notices when you're in a call, offers a **Record** button (it never records
 - **Answers questions** ("Ask Hark") about one meeting or your whole library, citing timestamps you can click.
 - **Organises** with folders, tags, search, highlights and clips.
 - **Shares** via links on your network, `.hark` bundles you can import on another computer, or a standalone web page.
+
+![Library with folders and tags](docs/img/library.png)
 
 ## Install
 

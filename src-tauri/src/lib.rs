@@ -48,10 +48,8 @@ pub fn run() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let app = window.app_handle();
                 let close_to_tray = app.state::<AppState>().settings.read().close_to_tray;
-                if window.label() == "main" && close_to_tray {
-                    let _ = window.hide();
-                    api.prevent_close();
-                } else if window.label() != "main" {
+                // Popup/record bar always hide; the main window hides when close-to-tray is on.
+                if window.label() != "main" || close_to_tray {
                     let _ = window.hide();
                     api.prevent_close();
                 }

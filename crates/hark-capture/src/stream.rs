@@ -5,6 +5,11 @@ use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{SampleFormat, Stream, StreamConfig};
 use std::sync::Arc;
 
+/// Callback receiving mono f32 frames.
+pub type AudioSink = Arc<dyn Fn(&[f32]) + Send + Sync>;
+/// Callback receiving a stream error message.
+pub type ErrorSink = Arc<dyn Fn(String) + Send + Sync>;
+
 #[derive(Debug, thiserror::Error)]
 pub enum StreamError {
     #[error("no audio device available")]
@@ -26,8 +31,8 @@ pub struct InputStream {
 pub fn open_input(
     device: &cpal::Device,
     loopback: bool,
-    on_audio: Arc<dyn Fn(&[f32]) + Send + Sync>,
-    on_error: Arc<dyn Fn(String) + Send + Sync>,
+    on_audio: AudioSink,
+    on_error: ErrorSink,
 ) -> Result<InputStream, StreamError> {
     let supported = if loopback { device.default_output_config() } else { device.default_input_config() }
         .map_err(|e| StreamError::Cpal(e.to_string()))?;

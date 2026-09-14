@@ -12,7 +12,7 @@ use std::time::Duration;
 pub fn sample_levels(mic_id: Option<&str>, loopback_id: Option<&str>, dur: Duration) -> (f32, f32) {
     let mic_buf = Arc::new(Mutex::new(Vec::<f32>::new()));
     let sys_buf = Arc::new(Mutex::new(Vec::<f32>::new()));
-    let noop_err: Arc<dyn Fn(String) + Send + Sync> = Arc::new(|_| {});
+    let noop_err: crate::stream::ErrorSink = Arc::new(|_| {});
 
     let _mic = find_device(mic_id, false).and_then(|d| {
         let b = mic_buf.clone();

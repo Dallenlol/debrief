@@ -85,7 +85,7 @@ impl Recorder {
         });
 
         let err_tx = tx.clone();
-        let on_error: Arc<dyn Fn(String) + Send + Sync> = Arc::new(move |e| {
+        let on_error: crate::stream::ErrorSink = Arc::new(move |e| {
             let _ = err_tx.send(CaptureEvent::Error(e));
         });
 

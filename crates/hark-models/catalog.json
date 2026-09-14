@@ -1,0 +1,79 @@
+{
+  "models": [
+    {
+      "id": "whisper-base",
+      "kind": "asr",
+      "name": "Whisper Base",
+      "file": "ggml-base.bin",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+      "sha256": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+      "size_bytes": 147951465,
+      "note": "Fast, fine for live captions on any CPU."
+    },
+    {
+      "id": "whisper-small",
+      "kind": "asr",
+      "name": "Whisper Small",
+      "file": "ggml-small.bin",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+      "sha256": "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
+      "size_bytes": 487601967,
+      "note": "Good balance of speed and accuracy."
+    },
+    {
+      "id": "whisper-medium",
+      "kind": "asr",
+      "name": "Whisper Medium",
+      "file": "ggml-medium.bin",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
+      "sha256": "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208",
+      "size_bytes": 1533763059,
+      "note": "High accuracy; slow on CPU."
+    },
+    {
+      "id": "whisper-large-v3-turbo",
+      "kind": "asr",
+      "name": "Whisper Large v3 Turbo",
+      "file": "ggml-large-v3-turbo.bin",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
+      "sha256": "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
+      "size_bytes": 1624555275,
+      "note": "Best accuracy; needs a GPU for reasonable speed."
+    },
+    {
+      "id": "qwen3-1.7b-q4",
+      "kind": "llm",
+      "name": "Qwen3 1.7B (Q4_K_M)",
+      "file": "Qwen3-1.7B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
+      "sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+      "size_bytes": 1107409472,
+      "note": "Small and quick; summaries and chat on low-end CPUs."
+    },
+    {
+      "id": "qwen3-4b-q4",
+      "kind": "llm",
+      "name": "Qwen3 4B (Q4_K_M)",
+      "file": "Qwen3-4B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+      "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+      "size_bytes": 2497280256,
+      "note": "Recommended for CPUs with 12 GB+ RAM."
+    },
+    {
+      "id": "qwen3-8b-q4",
+      "kind": "llm",
+      "name": "Qwen3 8B (Q4_K_M)",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf",
+      "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "size_bytes": 5027783488,
+      "note": "Best quality; needs a GPU with 6 GB+ VRAM."
+    }
+  ],
+  "tiers": {
+    "cpu_low":  { "asr_live": "whisper-base",  "asr_quality": "whisper-small",           "llm": "qwen3-1.7b-q4" },
+    "cpu_high": { "asr_live": "whisper-small", "asr_quality": "whisper-medium",          "llm": "qwen3-4b-q4" },
+    "gpu":      { "asr_live": "whisper-small", "asr_quality": "whisper-large-v3-turbo",  "llm": "qwen3-8b-q4" }
+  }
+}

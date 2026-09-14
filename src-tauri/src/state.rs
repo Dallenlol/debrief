@@ -12,11 +12,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 /// Loaded AI engines, keyed by model id. Loaded lazily, dropped on `unload_all`.
+pub const EMBED_MODEL_ID: &str = "bge-small-en-v1.5-q8";
+
 #[derive(Default)]
 pub struct Engines {
     pub whisper: HashMap<String, Arc<WhisperEngine>>,
     /// (backend key, backend) - key changes when settings change.
     pub llm: Option<(String, Arc<dyn LlmBackend>)>,
+    pub embed: Option<Arc<hark_llm::EmbedEngine>>,
     pub last_used: Option<Instant>,
 }
 
@@ -166,10 +169,34 @@ impl AppState {
         Some(backend)
     }
 
+    /// The embedding model for semantic search, if downloaded.
+    pub fn embed(&self) -> Option<Arc<hark_llm::EmbedEngine>> {
+        {
+            let mut e = self.engines.lock();
+            if let Some(m) = e.embed.clone() {
+                e.last_used = Some(Instant::now());
+                return Some(m);
+            }
+        }
+        let path = self.model_file(EMBED_MODEL_ID)?;
+        let engine = match hark_llm::EmbedEngine::load(&path) {
+            Ok(e) => Arc::new(e),
+            Err(err) => {
+                log::error!("load embed model: {err}");
+                return None;
+            }
+        };
+        let mut e = self.engines.lock();
+        e.embed = Some(engine.clone());
+        e.last_used = Some(Instant::now());
+        Some(engine)
+    }
+
     pub fn unload_engines(&self) {
         let mut e = self.engines.lock();
         e.whisper.clear();
         e.llm = None;
+        e.embed = None;
         e.last_used = None;
     }
 }

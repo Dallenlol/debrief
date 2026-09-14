@@ -16,7 +16,7 @@ use std::sync::OnceLock;
 
 static BACKEND: OnceLock<LlamaBackend> = OnceLock::new();
 
-fn backend() -> Result<&'static LlamaBackend, LlmError> {
+pub(crate) fn backend() -> Result<&'static LlamaBackend, LlmError> {
     if let Some(b) = BACKEND.get() {
         return Ok(b);
     }

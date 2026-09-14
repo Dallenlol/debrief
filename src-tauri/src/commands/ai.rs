@@ -134,17 +134,17 @@ pub fn send_chat(app: AppHandle, chat_id: String, text: String) -> CmdResult<Cha
     let scope_meeting = if chat.scope_kind == "meeting" { chat.scope_id.clone() } else { None };
     std::thread::spawn(move || {
         let state = app2.state::<AppState>();
-        // Retrieval: top chunks by BM25; for a single short meeting include everything.
+        // Retrieval: BM25 + embeddings (when available); a single short meeting is passed whole.
         let mut hits = match &scope_meeting {
             Some(mid) => {
                 let all = state.store.chunks(mid).unwrap_or_default();
                 if all.len() <= 12 {
                     all
                 } else {
-                    state.store.search_chunks(&text, Some(mid), 10).unwrap_or_default()
+                    crate::embed_stage::retrieve(&state, &text, Some(mid), 10)
                 }
             }
-            None => state.store.search_chunks(&text, None, 12).unwrap_or_default(),
+            None => crate::embed_stage::retrieve(&state, &text, None, 12),
         };
         hits.sort_by(|a, b| a.meeting_id.cmp(&b.meeting_id).then(a.start_ms.cmp(&b.start_ms)));
         let passages: Vec<Passage> = hits

@@ -12,6 +12,7 @@ pub fn run_summary(app: &AppHandle, meeting_id: &str, template_id: Option<&str>)
     let emit = |stage: &'static str, progress: f32, error: Option<String>| {
         let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting_id.to_string(), stage, progress, error });
     };
+    let emit = &emit;
     emit("summary", 0.9, None);
     let Some(backend) = state.llm() else {
         notice(app, "info", "Summary skipped: no language model available. Download one in Settings or connect an endpoint.".into());
@@ -50,8 +51,24 @@ pub fn run_summary(app: &AppHandle, meeting_id: &str, template_id: Option<&str>)
         transcript,
         highlights: highlights.iter().map(|h| format!("[{}]", hark_llm::summary::fmt_stamp(*h as i64))).collect::<Vec<_>>().join(", "),
     };
-    // fable: ~24k chars (~6k tokens) keeps 8k-context models safe; long meetings get head+tail.
-    match hark_llm::summary::generate(backend.as_ref(), &template.body, &vars, 24_000) {
+    // Auto-title from the opening minutes, unless the user already named the meeting.
+    if meeting.title_auto {
+        let app_label = meeting.app.as_deref().map(app_label);
+        match hark_llm::title::generate(backend.as_ref(), &vars.transcript, app_label) {
+            Ok(Some(t)) => {
+                let _ = state.store.set_title(meeting_id, &t, false);
+                emit("title", 0.9, None);
+            }
+            Ok(None) => {}
+            Err(e) => log::warn!("auto-title failed: {e}"),
+        }
+    }
+
+    // ~24k chars (~6k tokens) per model call keeps 8k-context models safe; longer
+    // transcripts are condensed block by block first (see hark_llm::chunked).
+    let emit_p = emit.clone();
+    let progress = move |done: usize, total: usize| emit_p("summary", 0.9 + 0.08 * (done as f32 / total.max(1) as f32), None);
+    match hark_llm::summary::generate_with_progress(backend.as_ref(), &template.body, &vars, 24_000, progress) {
         Ok(r) => {
             let s = hark_store::Summary {
                 meeting_id: meeting_id.to_string(),
@@ -67,7 +84,22 @@ pub fn run_summary(app: &AppHandle, meeting_id: &str, template_id: Option<&str>)
         Err(e) => {
             log::error!("summary failed: {e}");
             notice(app, "warning", format!("Summary failed: {e}"));
+            let _ = state.store.set_meeting_error(meeting_id, Some(&format!("summary: {e}")));
             emit("done", 1.0, Some(e.to_string()));
         }
+    }
+}
+
+/// Human label for a detected app id ("zoom" -> "Zoom").
+fn app_label(app: &str) -> &str {
+    match app {
+        "zoom" => "Zoom",
+        "teams" => "Microsoft Teams",
+        "meet" => "Google Meet",
+        "webex" => "Webex",
+        "discord" => "Discord",
+        "slack" => "Slack",
+        "facetime" => "FaceTime",
+        other => other,
     }
 }

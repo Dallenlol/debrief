@@ -89,6 +89,16 @@
       "sha256": "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e",
       "size_bytes": 40257283,
       "note": "Tells speakers apart and remembers voices you have named."
+    },
+    {
+      "id": "bge-small-en-v1.5-q8",
+      "kind": "embedding",
+      "name": "BGE Small v1.5 (embeddings)",
+      "file": "bge-small-en-v1.5-q8_0.gguf",
+      "url": "https://huggingface.co/CompendiumLabs/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-q8_0.gguf",
+      "sha256": "ec38e8da142596baa913124ae50550de284b6916bf59577ef2f0cb9660c2f514",
+      "size_bytes": 36806944,
+      "note": "Semantic search for Ask Hark. Tiny and fast on any CPU."
     }
   ],
   "tiers": {
@@ -109,6 +119,7 @@
     }
   },
   "common": [
+    "bge-small-en-v1.5-q8",
     "pyannote-seg-3",
     "titanet-small"
   ]

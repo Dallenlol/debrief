@@ -1,5 +1,6 @@
 mod commands;
 mod detector_loop;
+mod embed_stage;
 mod events;
 mod pipeline;
 mod recorder;

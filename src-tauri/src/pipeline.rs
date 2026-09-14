@@ -147,6 +147,10 @@ pub fn post_process(app: &AppHandle, mut meeting: Meeting) {
         run_cleanup(app, &meeting.id);
     }
     let _ = state.store.rebuild_chunks(&meeting.id);
+    emit("embed", 0.85, None);
+    if let Err(e) = crate::embed_stage::embed_meeting(app, &meeting.id) {
+        log::warn!("embedding failed: {e}");
+    }
     if settings.summary_enabled && !segs.is_empty() {
         run_summary(app, &meeting.id, None);
     }

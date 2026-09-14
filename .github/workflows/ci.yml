@@ -31,6 +31,7 @@ jobs:
         with:
           cache-directories: |
             ~/.cache/sherpa-rs
+            ~/Library/Caches/sherpa-rs
             ~/AppData/Local/sherpa-rs
       - name: Install LLVM (bindgen)
         if: runner.os == 'Windows'

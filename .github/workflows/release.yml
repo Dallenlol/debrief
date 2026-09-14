@@ -48,6 +48,7 @@ jobs:
           # sherpa-rs downloads prebuilt binaries here; cache them with the build-script output that references them.
           cache-directories: |
             ~/.cache/sherpa-rs
+            ~/Library/Caches/sherpa-rs
             ~/AppData/Local/sherpa-rs
             ~/.cache/hark
       - name: Install LLVM (bindgen)

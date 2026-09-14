@@ -45,4 +45,5 @@ log = "0.4"
 tracing = "0.1"
 tracing-log = "0.2"
 hound = "3.5"
+uuid.workspace = true
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

@@ -7,6 +7,7 @@ mod settings;
 mod shortcuts;
 mod smoke;
 mod state;
+mod summary_stage;
 mod tray;
 mod windows;
 
@@ -86,6 +87,17 @@ pub fn run() {
             commands::speakers::delete_known_speaker,
             commands::speakers::rerun_cleanup,
             commands::speakers::test_llm_endpoint,
+            commands::ai::list_templates,
+            commands::ai::save_template,
+            commands::ai::delete_template,
+            commands::ai::get_summary,
+            commands::ai::generate_summary,
+            commands::ai::list_chats,
+            commands::ai::create_chat,
+            commands::ai::delete_chat,
+            commands::ai::chat_messages,
+            commands::ai::send_chat,
+            commands::ai::cancel_chat,
             commands::devices::list_audio_devices,
             commands::devices::sample_levels,
         ])

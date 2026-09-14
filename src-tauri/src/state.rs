@@ -34,11 +34,20 @@ pub struct AppState {
     pub diarize_bin: Option<PathBuf>,
     /// Model downloads in flight; value = cancel flag.
     pub downloads: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Streaming chat replies in flight, by chat id.
+    pub chat_cancels: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
 impl AppState {
     pub fn new(store: Store) -> Self {
         let settings = Settings::load(&store);
+        let builtins: Vec<hark_store::Template> = hark_llm::summary::builtin_templates()
+            .into_iter()
+            .map(|t| hark_store::Template { id: t.id.to_string(), name: t.name, description: t.description, body: t.body, builtin: true })
+            .collect();
+        if let Err(e) = store.seed_templates(&builtins) {
+            log::error!("seed templates: {e}");
+        }
         AppState {
             store: Arc::new(store),
             settings: RwLock::new(settings),
@@ -51,6 +60,7 @@ impl AppState {
             ffmpeg: find_sidecar("ffmpeg"),
             diarize_bin: find_sidecar("hark-diarize"),
             downloads: Mutex::new(HashMap::new()),
+            chat_cancels: Mutex::new(HashMap::new()),
         }
     }
 

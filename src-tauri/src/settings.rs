@@ -35,6 +35,8 @@ pub struct Settings {
     pub llm_api_key: Option<String>,
     pub cleanup_enabled: bool,
     pub diarize_enabled: bool,
+    pub summary_enabled: bool,
+    pub default_template_id: String,
 }
 
 impl Default for Settings {
@@ -66,6 +68,8 @@ impl Default for Settings {
             llm_api_key: None,
             cleanup_enabled: true,
             diarize_enabled: true,
+            summary_enabled: true,
+            default_template_id: "general".into(),
         }
     }
 }

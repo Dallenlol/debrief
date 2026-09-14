@@ -67,6 +67,7 @@ fn smoke(app: &AppHandle) -> Result<(), String> {
                     }
                 }
                 let dir = state.store.recordings_dir(&m.id);
+                smoke_ai(&state, &m.id);
                 for f in ["mic.wav", "sys.wav", "mix.wav", "screen.mp4"] {
                     if let Ok(md) = std::fs::metadata(dir.join(f)) {
                         println!("  {f}: {} bytes", md.len());
@@ -82,4 +83,39 @@ fn smoke(app: &AppHandle) -> Result<(), String> {
         }
         std::thread::sleep(Duration::from_millis(500));
     }
+}
+
+/// Print the summary once it lands, and (with HARK_SMOKE_CHAT) ask one grounded question.
+fn smoke_ai(state: &AppState, meeting_id: &str) {
+    let deadline = Instant::now() + Duration::from_secs(240);
+    while Instant::now() < deadline {
+        if let Ok(Some(s)) = state.store.get_summary(meeting_id) {
+            println!("SMOKE summary ({}):", s.model);
+            for l in s.markdown.lines().take(14) {
+                println!("  | {l}");
+            }
+            break;
+        }
+        std::thread::sleep(Duration::from_secs(2));
+    }
+    if std::env::var_os("HARK_SMOKE_CHAT").is_none() {
+        return;
+    }
+    let Some(backend) = state.llm() else { return };
+    let hits = state.store.chunks(meeting_id).unwrap_or_default();
+    let passages: Vec<hark_llm::chat::Passage> = hits
+        .iter()
+        .map(|h| hark_llm::chat::Passage {
+            meeting_id: h.meeting_id.clone(),
+            meeting_title: h.meeting_title.clone(),
+            meeting_date: "today".into(),
+            start_ms: h.start_ms,
+            end_ms: h.end_ms,
+            text: h.text.clone(),
+        })
+        .collect();
+    let msgs = hark_llm::chat::build_messages("What did the speaker ask people to do?", &[], &passages, false);
+    let answer = hark_llm::backend::complete(backend.as_ref(), &msgs, &hark_llm::GenOptions::default()).unwrap_or_else(|e| format!("ERR {e}"));
+    println!("SMOKE chat: {answer}");
+    println!("  citations: {:?}", hark_llm::chat::parse_citations(&answer, &passages));
 }

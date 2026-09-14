@@ -142,12 +142,17 @@ pub fn post_process(app: &AppHandle, mut meeting: Meeting) {
     let _ = state.store.update_meeting(&meeting);
     emit("cleanup", 0.75, None);
 
-    // 4. LLM cleanup.
+    // 4. LLM cleanup, retrieval chunks, summary.
     if settings.cleanup_enabled && !segs.is_empty() {
         run_cleanup(app, &meeting.id);
     }
+    let _ = state.store.rebuild_chunks(&meeting.id);
+    if settings.summary_enabled && !segs.is_empty() {
+        run_summary(app, &meeting.id, None);
+    }
     emit("done", 1.0, None);
 }
+pub use crate::summary_stage::run_summary;
 
 /// Re-run only the cleanup pass on stored segments.
 pub fn run_cleanup(app: &AppHandle, meeting_id: &str) {

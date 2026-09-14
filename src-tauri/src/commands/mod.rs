@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod devices;
 pub mod meetings;
 pub mod models;

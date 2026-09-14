@@ -9,6 +9,8 @@ pub const RECORDING_STATE: &str = "recording_state";
 pub const MODEL_PROGRESS: &str = "model_progress";
 pub const PROCESSING: &str = "processing";
 pub const NOTICE: &str = "notice";
+pub const CHAT_TOKEN: &str = "chat_token";
+pub const CHAT_DONE: &str = "chat_done";
 
 #[derive(Serialize, Clone)]
 pub struct DetectionPayload {

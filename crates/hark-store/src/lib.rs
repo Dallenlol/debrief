@@ -3,6 +3,7 @@
 //! The crate knows nothing about Tauri. Everything is synchronous; callers
 //! wrap it in `Arc` and call from whatever thread they like.
 
+mod ai;
 mod db;
 mod meetings;
 mod migrations;
@@ -10,6 +11,7 @@ mod segments;
 mod settings;
 mod speakers;
 
+pub use ai::{Chat, ChatMessage, ChunkHit, Summary, Template, CHUNK_MS};
 pub use db::{data_dir, Store};
 pub use meetings::{Meeting, MeetingStatus};
 pub use segments::{NewSegment, SearchHit, Segment};

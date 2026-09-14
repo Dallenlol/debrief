@@ -112,6 +112,18 @@ impl Store {
     }
 }
 
+/// Retrieval flavour: words OR-ed (BM25 ranks the best chunk), stop-words dropped.
+pub(crate) fn fts_query_or(input: &str) -> String {
+    const STOP: &[&str] = &["the", "a", "an", "and", "or", "of", "to", "in", "on", "is", "was", "what", "did", "we", "about", "for", "it", "that", "this", "with", "be", "are", "were", "do", "does", "how", "who", "when", "where", "why", "say", "said", "i", "you", "they", "he", "she", "at", "by", "from", "as", "our", "my", "me", "us"];
+    input
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .map(|w| w.trim_matches('\'').to_lowercase())
+        .filter(|w| w.len() > 1 && !STOP.contains(&w.as_str()))
+        .map(|w| format!("\"{w}\"*"))
+        .collect::<Vec<_>>()
+        .join(" OR ")
+}
+
 /// Turn free text into a safe FTS5 query: each word quoted, prefix-matched, AND-ed.
 fn fts_query(input: &str) -> String {
     input
@@ -155,6 +167,12 @@ mod tests {
         s.replace_segments(&m.id, &[NewSegment { start_ms: 0, end_ms: 1, speaker: None, text: "beta".into() }]).unwrap();
         assert!(s.search("alpha", 5).unwrap().is_empty());
         assert_eq!(s.search("beta", 5).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn fts_query_or_drops_stopwords() {
+        assert_eq!(fts_query_or("What did we say about the budget?"), "\"budget\"*");
+        assert_eq!(fts_query_or("the a of"), "");
     }
 
     #[test]

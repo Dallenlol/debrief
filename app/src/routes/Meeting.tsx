@@ -1,11 +1,13 @@
 import { ArrowLeft, Check, Pencil, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ChatPanel } from "@/components/ChatPanel";
+import { Markdown } from "@/components/Markdown";
 import { Player, type PlayerHandle } from "@/components/Player";
 import { Transcript } from "@/components/Transcript";
 import { Badge, Button, Input, SectionTitle, Spinner } from "@/components/ui";
 import { appLabel, fmtDate, fmtDuration, fmtTime } from "@/lib/format";
-import { cmd, subscribe, type MeetingDetail } from "@/lib/ipc";
+import { cmd, subscribe, type MeetingDetail, type Summary, type Template } from "@/lib/ipc";
 
 export function MeetingPage() {
   const { id = "" } = useParams();
@@ -19,6 +21,10 @@ export function MeetingPage() {
   const [stage, setStage] = useState<string | null>(null);
   const [view, setView] = useState<"clean" | "raw" | null>(null);
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const [tab, setTab] = useState<"transcript" | "summary" | "chat">("transcript");
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateId, setTemplateId] = useState<string>("");
   const player = useRef<PlayerHandle>(null);
 
   const load = useCallback(() => {
@@ -27,7 +33,15 @@ export function MeetingPage() {
       setTitle(d.meeting.title);
       setError(null);
     }, (e) => setError(String(e)));
+    void cmd.getSummary(id).then((s) => {
+      setSummary(s);
+      if (s) setTemplateId((t) => t || s.template_id);
+    });
   }, [id]);
+
+  useEffect(() => {
+    void cmd.listTemplates().then(setTemplates);
+  }, []);
 
   useEffect(() => {
     load();
@@ -37,6 +51,10 @@ export function MeetingPage() {
       if (p.stage === "done" || p.stage === "failed") load();
     });
   }, [id, load]);
+
+  useEffect(() => {
+    if (params.get("tab") === "chat") setTab("chat");
+  }, [params]);
 
   // Deep link from search: ?t=<ms>
   useEffect(() => {
@@ -151,47 +169,79 @@ export function MeetingPage() {
           )}
         </div>
 
-        <div>
-          <SectionTitle
-            hint={
-              processing ? (
-                <span className="inline-flex items-center gap-2"><Spinner className="h-3 w-3" /> {stage ?? "processing"}</span>
-              ) : hasClean ? (
-                <span className="inline-flex rounded-md bg-canvas-3 p-0.5 text-[11px] font-medium">
-                  {(["clean", "raw"] as const).map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setView(v)}
-                      className={`rounded px-2 py-0.5 capitalize ${useClean === (v === "clean") ? "bg-canvas text-ink shadow-card" : "text-ink-3"}`}
-                    >
-                      {v === "clean" ? "Cleaned" : "Raw"}
-                    </button>
+        <div className="flex min-h-[60vh] flex-col">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="inline-flex rounded-md bg-canvas-3 p-0.5 text-[12px] font-medium">
+              {(["transcript", "summary", "chat"] as const).map((t) => (
+                <button key={t} onClick={() => setTab(t)} className={`rounded px-3 py-1 capitalize ${tab === t ? "bg-canvas text-ink shadow-card" : "text-ink-3 hover:text-ink"}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            {tab === "transcript" && (processing ? (
+              <span className="inline-flex items-center gap-2 text-[12px] text-ink-3"><Spinner className="h-3 w-3" /> {stage ?? "processing"}</span>
+            ) : hasClean ? (
+              <span className="inline-flex rounded-md bg-canvas-3 p-0.5 text-[11px] font-medium">
+                {(["clean", "raw"] as const).map((v) => (
+                  <button key={v} onClick={() => setView(v)} className={`rounded px-2 py-0.5 ${useClean === (v === "clean") ? "bg-canvas text-ink shadow-card" : "text-ink-3"}`}>
+                    {v === "clean" ? "Cleaned" : "Raw"}
+                  </button>
+                ))}
+              </span>
+            ) : (
+              <span className="text-[12px] text-ink-3">{detail.segments.length} segments</span>
+            ))}
+          </div>
+
+          {tab === "transcript" && (
+            detail.segments.length === 0 && processing ? (
+              <p className="text-sm text-ink-3">Transcribing... this usually takes well under a minute.</p>
+            ) : detail.segments.length === 0 ? (
+              <p className="text-sm text-ink-3">
+                No transcript. Download a speech model in <Link to="/settings" className="underline">Settings</Link>, then Re-transcribe.
+              </p>
+            ) : (
+              <Transcript
+                segments={detail.segments}
+                currentMs={currentMs}
+                onSeek={(ms) => player.current?.seek(ms)}
+                useClean={useClean}
+                speakers={speakers}
+                onRenameSpeaker={renameSpeaker}
+                onAcceptSuggestion={acceptSuggestion}
+                onDismissSuggestion={(label) => setDismissed((d) => [...d, label])}
+              />
+            )
+          )}
+
+          {tab === "summary" && (
+            <div>
+              <div className="mb-4 flex items-center gap-2">
+                <select
+                  value={templateId || summary?.template_id || "general"}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  className="focus-ring h-8 rounded-md border border-line-2 bg-canvas px-2 text-[13px]"
+                >
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
-                </span>
+                </select>
+                <Button variant="outline" size="sm" disabled={stage === "summary" || detail.segments.length === 0} onClick={() => { setStage("summary"); void cmd.generateSummary(m.id, templateId || undefined).catch((e) => { setStage(null); alert(String(e)); }); }}>
+                  <Sparkles size={14} /> {summary ? "Regenerate" : "Generate"}
+                </Button>
+                {stage === "summary" && <span className="inline-flex items-center gap-2 text-[12px] text-ink-3"><Spinner className="h-3 w-3" /> writing...</span>}
+                {summary && <span className="ml-auto text-[11px] text-ink-3">{summary.model}</span>}
+              </div>
+              {summary ? (
+                <Markdown text={summary.markdown} onSeek={(ms) => player.current?.seek(ms)} />
               ) : (
-                `${detail.segments.length} segments`
-              )
-            }
-          >
-            Transcript
-          </SectionTitle>
-          {detail.segments.length === 0 && processing ? (
-            <p className="text-sm text-ink-3">Transcribing... this usually takes well under a minute.</p>
-          ) : detail.segments.length === 0 ? (
-            <p className="text-sm text-ink-3">
-              No transcript. Download a speech model in <Link to="/settings" className="underline">Settings</Link>, then Re-transcribe.
-            </p>
-          ) : (
-            <Transcript
-              segments={detail.segments}
-              currentMs={currentMs}
-              onSeek={(ms) => player.current?.seek(ms)}
-              useClean={useClean}
-              speakers={speakers}
-              onRenameSpeaker={renameSpeaker}
-              onAcceptSuggestion={acceptSuggestion}
-              onDismissSuggestion={(label) => setDismissed((d) => [...d, label])}
-            />
+                <p className="text-sm text-ink-3">No summary yet. Pick a template and generate one.</p>
+              )}
+            </div>
+          )}
+
+          {tab === "chat" && (
+            <ChatPanel scopeKind="meeting" scopeId={m.id} onSeek={(ms) => player.current?.seek(ms)} className="min-h-[60vh] flex-1" />
           )}
         </div>
       </div>

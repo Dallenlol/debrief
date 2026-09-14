@@ -1,6 +1,7 @@
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Download, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { TemplatesEditor } from "@/components/TemplatesEditor";
 import { Button, Card, Input, Meter, SectionTitle, Select, Spinner, Toggle } from "@/components/ui";
 import { appLabel, fmtBytes } from "@/lib/format";
 import { cmd, subscribe, type AudioDevice, type Hardware, type ModelRow, type Settings, type Tier } from "@/lib/ipc";
@@ -266,6 +267,14 @@ export function SettingsPage() {
           </div>
           <Toggle label="Identify speakers" description="Who spoke when, plus voice memory so you only name someone once. Uses two small local models." checked={s.diarize_enabled} onChange={(v) => void update({ diarize_enabled: v })} />
           <Toggle label="Clean up transcripts with AI" description="Fixes garbled words, broken English and filler. The raw transcript is always kept." checked={s.cleanup_enabled} onChange={(v) => void update({ cleanup_enabled: v })} />
+          <Toggle label="Write a summary after each recording" description="Uses the default template below. You can regenerate with any template later." checked={s.summary_enabled} onChange={(v) => void update({ summary_enabled: v })} />
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle hint="Markdown prompts the summary is written from">Summary templates</SectionTitle>
+        <Card className="p-5">
+          <TemplatesEditor defaultId={s.default_template_id} onDefaultChange={(id) => void update({ default_template_id: id })} />
         </Card>
       </section>
 

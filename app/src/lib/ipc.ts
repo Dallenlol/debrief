@@ -88,6 +88,49 @@ export interface Settings {
   llm_api_key: string | null;
   cleanup_enabled: boolean;
   diarize_enabled: boolean;
+  summary_enabled: boolean;
+  default_template_id: string;
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  body: string;
+  builtin: boolean;
+}
+
+export interface Summary {
+  meeting_id: string;
+  template_id: string;
+  markdown: string;
+  structured: {
+    summary: string;
+    action_items: string[];
+    decisions: string[];
+    open_questions: string[];
+    key_moments: { ms: number | null; text: string }[];
+    sections: Record<string, string>;
+  } | null;
+  model: string;
+  created_at: string;
+}
+
+export interface Chat {
+  id: string;
+  scope_kind: "meeting" | "all";
+  scope_id: string | null;
+  title: string;
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  chat_id: string;
+  role: "user" | "assistant" | string;
+  content: string;
+  citations: unknown;
+  created_at: string;
 }
 
 export interface AudioDevice {
@@ -173,6 +216,18 @@ export const cmd = {
   testLlmEndpoint: (url: string, apiKey: string | null, model: string) =>
     invoke<string[]>("test_llm_endpoint", { url, apiKey, model }),
 
+  listTemplates: () => invoke<Template[]>("list_templates"),
+  saveTemplate: (template: Template) => invoke<Template>("save_template", { template }),
+  deleteTemplate: (id: string) => invoke<void>("delete_template", { id }),
+  getSummary: (id: string) => invoke<Summary | null>("get_summary", { id }),
+  generateSummary: (id: string, templateId?: string) => invoke<void>("generate_summary", { id, templateId }),
+  listChats: (scopeKind: "meeting" | "all", scopeId: string | null) => invoke<Chat[]>("list_chats", { scopeKind, scopeId }),
+  createChat: (scopeKind: "meeting" | "all", scopeId: string | null, title?: string) => invoke<Chat>("create_chat", { scopeKind, scopeId, title }),
+  deleteChat: (id: string) => invoke<void>("delete_chat", { id }),
+  chatMessages: (chatId: string) => invoke<ChatMessage[]>("chat_messages", { chatId }),
+  sendChat: (chatId: string, text: string) => invoke<ChatMessage>("send_chat", { chatId, text }),
+  cancelChat: (chatId: string) => invoke<void>("cancel_chat", { chatId }),
+
   listAudioDevices: () => invoke<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>("list_audio_devices"),
   sampleLevels: (mic: string | null, loopback: string | null) =>
     invoke<[number, number]>("sample_levels", { mic, loopback }),
@@ -186,6 +241,8 @@ export interface Events {
   model_progress: { id: string; done: number; total: number; status: "downloading" | "done" | "failed"; error: string | null };
   processing: { meeting_id: string; stage: string; progress: number; error: string | null };
   notice: { level: "info" | "warning" | "error"; message: string };
+  chat_token: { chat_id: string; message_id: string; delta: string };
+  chat_done: { chat_id: string; message: ChatMessage; error: string | null };
 }
 
 export function on<K extends keyof Events>(name: K, handler: (payload: Events[K]) => void): Promise<UnlistenFn> {

@@ -4,6 +4,7 @@ import { Shell } from "@/components/Shell";
 import { Spinner } from "@/components/ui";
 import { cmd } from "@/lib/ipc";
 import { installTheme } from "@/lib/theme";
+import { AskPage } from "@/routes/Ask";
 import { Library } from "@/routes/Library";
 import { MeetingPage } from "@/routes/Meeting";
 import { Onboarding } from "@/routes/Onboarding";
@@ -38,6 +39,7 @@ function MainApp() {
       children: [
         { index: true, element: <Library /> },
         { path: "meeting/:id", element: <MeetingPage /> },
+        { path: "ask", element: <AskPage /> },
         { path: "settings", element: <SettingsPage /> },
       ],
     },

@@ -23,7 +23,7 @@ Positioning: "the open-source, offline Fathom alternative."
 | Capture | Audio always (mic + system audio as separate tracks); screen video optional toggle, default ON, remembered. |
 | Sharing | LAN link served by the app while it runs + export bundle / standalone HTML. |
 | Detection | Known-app/window detection (primary) + audio-activity fallback + global hotkey + tray. Popup only; nothing records without a click. |
-| Stack | Tauri 2 (Rust core) + React/TypeScript UI. AI engines linked natively (whisper.cpp, llama.cpp, sherpa-onnx). ffmpeg sidecar for screen video. |
+| Stack | Tauri 2.11 (Rust core) + React/TypeScript UI. AI engines linked natively (whisper-rs 0.16, llama-cpp-2 0.1.x, sherpa-rs 0.6). cpal 0.18 for mic + loopback. ffmpeg sidecar for screen video, mixing and clips. |
 | Platforms | Windows (`.exe` NSIS + `.msi`, CPU and CUDA variants), macOS (`.dmg`, universal, Metal). |
 | Name | **Hark** (working name; can change before repo publication). |
 
@@ -76,8 +76,8 @@ Each crate exposes a small, testable Rust API and has no knowledge of Tauri. `sr
 
 - **Mic:** `cpal`, default input device (selectable), 16 kHz mono float for ASR + 48 kHz for archive.
 - **System audio:**
-  - Windows: WASAPI loopback of the default render device.
-  - macOS: ScreenCaptureKit audio capture (macOS 13+). Requires Screen Recording permission; app guides the user through granting it.
+  - Windows: WASAPI loopback of the default render device (cpal builds an input stream on the output device).
+  - macOS 14.6+: CoreAudio process-tap loopback, also via cpal on the default output device. Requires Audio Recording permission; app guides the user through granting it. macOS < 14.6: system audio unsupported (mic-only recording, documented).
 - Tracks kept **separate** (`mic.wav`, `sys.wav`) and also mixed to `mix.opus` for playback/export. Mic track = "me"; this is passed to diarization as a hint.
 - **Screen video:** bundled `ffmpeg` sidecar. Windows: `ddagrab`/`gdigrab` of chosen monitor or window; macOS: `avfoundation` screen device. 1080p max, 15 fps, H.264 fragmented MP4 (crash-safe). Audio is muxed in post from `mix.opus`.
 - Recording bar: elapsed time, level meters, live captions (last 2 lines), Pause/Resume, Stop, Mark highlight (stores timestamp).

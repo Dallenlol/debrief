@@ -60,6 +60,16 @@ jobs:
           cuda: "12.6.0"
           method: network
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]'
+      - name: Register CUDA with Visual Studio's MSBuild
+        if: matrix.features == 'cuda'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installerswhere.exe" -latest -products * -property installationPath
+          $src = Join-Path $env:CUDA_PATH "extrasisual_studio_integration\MSBuildExtensions"
+          Get-ChildItem -Path (Join-Path $vs "MSBuild\Microsoft\VC") -Directory | ForEach-Object {
+            $dst = Join-Path $_.FullName "BuildCustomizations"
+            if (Test-Path $dst) { Copy-Item "$src\*" $dst -Force; Write-Host "CUDA build customizations -> $dst" }
+          }
       - name: Install deps
         run: pnpm install --frozen-lockfile
       - name: Prepare sidecars and runtime libraries

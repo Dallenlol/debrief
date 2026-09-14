@@ -241,7 +241,7 @@ export interface ModelRow {
   spec: ModelSpec;
   present: boolean;
   downloading: boolean;
-  roles: ("live" | "quality" | "llm")[];
+  roles: ("live" | "quality" | "llm" | "speakers" | "search")[];
 }
 
 export interface RecordingState {

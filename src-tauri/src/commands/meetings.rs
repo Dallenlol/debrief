@@ -47,6 +47,7 @@ pub fn rename_meeting(state: State<AppState>, id: String, title: String) -> CmdR
     if m.title.is_empty() {
         return Err("title cannot be empty".into());
     }
+    m.title_auto = false;
     state.store.update_meeting(&m).map_err(err)?;
     Ok(m)
 }
@@ -68,6 +69,22 @@ pub fn search(state: State<AppState>, query: String, limit: Option<usize>) -> Cm
 }
 
 #[tauri::command]
-pub fn retranscribe(app: AppHandle, id: String) -> CmdResult<()> {
-    recorder::retranscribe(&app, &id)
+pub fn retranscribe(app: AppHandle, id: String, model: Option<String>) -> CmdResult<()> {
+    recorder::retranscribe(&app, &id, model)
+}
+
+#[tauri::command]
+pub fn rediarize(app: AppHandle, id: String) -> CmdResult<()> {
+    std::thread::spawn(move || {
+        let _ = crate::pipeline::rediarize(&app, &id);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reembed(app: AppHandle, id: String) -> CmdResult<()> {
+    std::thread::spawn(move || {
+        let _ = crate::pipeline::reembed(&app, &id);
+    });
+    Ok(())
 }

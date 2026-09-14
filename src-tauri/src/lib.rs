@@ -76,6 +76,8 @@ pub fn run() {
             commands::meetings::delete_meeting,
             commands::meetings::search,
             commands::meetings::retranscribe,
+            commands::meetings::rediarize,
+            commands::meetings::reembed,
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::pause_recording,

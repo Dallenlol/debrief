@@ -6,10 +6,10 @@ const now = Date.now();
 const iso = (minsAgo: number) => new Date(now - minsAgo * 60_000).toISOString();
 
 const meetings: Meeting[] = [
-  { id: "m1", title: "Q4 launch planning", app: "zoom", started_at: iso(95), ended_at: iso(50), duration_ms: 45 * 60_000, has_video: true, status: "ready", folder_id: "f1", created_at: iso(95) },
-  { id: "m2", title: "Priya 1:1", app: "meet", started_at: iso(24 * 60), ended_at: iso(24 * 60 - 28), duration_ms: 28 * 60_000, has_video: false, status: "ready", folder_id: null, created_at: iso(24 * 60) },
-  { id: "m3", title: "Acme discovery call", app: "teams", started_at: iso(3 * 24 * 60), ended_at: iso(3 * 24 * 60 - 41), duration_ms: 41 * 60_000, has_video: true, status: "ready", folder_id: "f2", created_at: iso(3 * 24 * 60) },
-  { id: "m4", title: "Standup", app: "discord", started_at: iso(4 * 24 * 60), ended_at: null, duration_ms: 12 * 60_000, has_video: false, status: "processing", folder_id: null, created_at: iso(4 * 24 * 60) },
+  { id: "m1", title: "Q4 launch planning", app: "zoom", started_at: iso(95), ended_at: iso(50), duration_ms: 45 * 60_000, has_video: true, status: "ready", folder_id: "f1", created_at: iso(95), error: null, title_auto: false, participants: ["Sarah Chen", "Marcus Webb", "Priya Patel"], calendar_uid: null },
+  { id: "m2", title: "Priya 1:1", app: "meet", started_at: iso(24 * 60), ended_at: iso(24 * 60 - 28), duration_ms: 28 * 60_000, has_video: false, status: "ready", folder_id: null, created_at: iso(24 * 60), error: null, title_auto: true, participants: ["Priya Patel"], calendar_uid: null },
+  { id: "m3", title: "Acme discovery call", app: "teams", started_at: iso(3 * 24 * 60), ended_at: iso(3 * 24 * 60 - 41), duration_ms: 41 * 60_000, has_video: true, status: "ready", folder_id: "f2", created_at: iso(3 * 24 * 60), error: null, title_auto: true, participants: [], calendar_uid: null },
+  { id: "m4", title: "Standup", app: "discord", started_at: iso(4 * 24 * 60), ended_at: null, duration_ms: 12 * 60_000, has_video: false, status: "processing", folder_id: null, created_at: iso(4 * 24 * 60), error: null, title_auto: true, participants: [], calendar_uid: null },
 ];
 
 const lines: [number, string, string, string | null][] = [

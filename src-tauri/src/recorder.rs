@@ -229,13 +229,16 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
 }
 
 /// Re-run the quality transcription for an existing meeting (e.g. after downloading a model).
-pub fn retranscribe(app: &AppHandle, meeting_id: &str) -> Result<(), String> {
+pub fn retranscribe(app: &AppHandle, meeting_id: &str, asr_model: Option<String>) -> Result<(), String> {
     let state = app.state::<AppState>();
     let mut m = state.store.get_meeting(meeting_id).map_err(|e| e.to_string())?.ok_or("no such meeting")?;
+    if m.status == MeetingStatus::Recording {
+        return Err("still recording".into());
+    }
     m.status = MeetingStatus::Processing;
     state.store.update_meeting(&m).map_err(|e| e.to_string())?;
     let app2 = app.clone();
-    std::thread::spawn(move || crate::pipeline::post_process(&app2, m));
+    std::thread::spawn(move || crate::pipeline::post_process_with(&app2, m, crate::pipeline::PostOpts { asr_model }));
     Ok(())
 }
 

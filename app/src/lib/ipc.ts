@@ -21,6 +21,10 @@ export interface Meeting {
   status: MeetingStatus;
   folder_id: string | null;
   created_at: string;
+  error: string | null;
+  title_auto: boolean;
+  participants: string[];
+  calendar_uid: string | null;
 }
 
 export interface Segment {
@@ -233,7 +237,9 @@ export const cmd = {
   renameMeeting: (id: string, title: string) => invoke<Meeting>("rename_meeting", { id, title }),
   deleteMeeting: (id: string) => invoke<void>("delete_meeting", { id }),
   search: (query: string, limit = 50) => invoke<SearchHit[]>("search", { query, limit }),
-  retranscribe: (id: string) => invoke<void>("retranscribe", { id }),
+  retranscribe: (id: string, model?: string | null) => invoke<void>("retranscribe", { id, model: model ?? null }),
+  rediarize: (id: string) => invoke<void>("rediarize", { id }),
+  reembed: (id: string) => invoke<void>("reembed", { id }),
 
   startRecording: (opts?: StartOptions) => invoke<Meeting>("start_recording", { opts }),
   stopRecording: () => invoke<Meeting>("stop_recording"),

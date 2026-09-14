@@ -64,7 +64,10 @@ pub fn rerun_cleanup(app: AppHandle, id: String) -> CmdResult<()> {
     state.store.get_meeting(&id).map_err(err)?.ok_or("meeting not found")?;
     state.store.clear_clean_text(&id).map_err(err)?;
     let app2 = app.clone();
-    std::thread::spawn(move || pipeline::run_cleanup(&app2, &id));
+    std::thread::spawn(move || {
+        pipeline::run_cleanup(&app2, &id);
+        let _ = pipeline::reembed(&app2, &id);
+    });
     Ok(())
 }
 

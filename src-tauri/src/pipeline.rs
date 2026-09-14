@@ -16,11 +16,24 @@ use tauri::{AppHandle, Emitter, Manager};
 pub const SUGGEST_THRESHOLD: f32 = 0.62;
 const LEVEL_HOP_MS: i64 = 250;
 
-pub fn post_process(app: &AppHandle, mut meeting: Meeting) {
+/// One-off choices for a (re-)run of the pipeline.
+#[derive(Default, Clone)]
+pub struct PostOpts {
+    /// Quality ASR model id to use instead of the configured one.
+    pub asr_model: Option<String>,
+}
+
+pub fn post_process(app: &AppHandle, meeting: Meeting) {
+    post_process_with(app, meeting, PostOpts::default())
+}
+
+pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) {
     let state = app.state::<AppState>();
     let dir = state.store.recordings_dir(&meeting.id);
     let settings = state.settings.read().clone();
     let meeting_id = meeting.id.clone();
+    meeting.error = None;
+    let _ = state.store.set_meeting_error(&meeting_id, None);
     let emit = |stage: &'static str, progress: f32, error: Option<String>| {
         let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting_id.clone(), stage, progress, error });
     };
@@ -46,7 +59,10 @@ pub fn post_process(app: &AppHandle, mut meeting: Meeting) {
     // 2. Quality transcription.
     emit("transcribe", 0.1, None);
     let tier = settings.tier(&state.hardware);
-    let (live_id, quality_id, _) = settings.model_ids(&state.catalog, tier);
+    let (live_id, mut quality_id, _) = settings.model_ids(&state.catalog, tier);
+    if let Some(m) = opts.asr_model.clone() {
+        quality_id = m;
+    }
     let mix = dir.join("mix.wav");
     let pcm = match read_wav_as_16k_mono(&mix) {
         Ok(p) => p,
@@ -72,58 +88,22 @@ pub fn post_process(app: &AppHandle, mut meeting: Meeting) {
 
     // 3. Diarization -> speaker labels.
     emit("diarize", 0.45, None);
-    let mut labels: Vec<Option<String>> = vec![None; captions.len()];
-    let mut speaker_rows: Vec<MeetingSpeaker> = Vec::new();
-    let mut embeddings: BTreeMap<String, Vec<f32>> = BTreeMap::new();
-    if settings.diarize_enabled && !captions.is_empty() {
-        match run_diarize_sidecar(&state, &mix) {
-            Ok(out) if !out.turns.is_empty() => {
-                let turns = out.turns;
-                let spans: Vec<(i64, i64)> = captions.iter().map(|c| (c.start_ms, c.end_ms)).collect();
-                let clusters = assign_clusters(&spans, &turns);
-                let me = me_cluster(&dir, &turns);
-                let names = cluster_names(&clusters, me, &settings.user_name);
-                for (i, c) in clusters.iter().enumerate() {
-                    labels[i] = c.and_then(|c| names.get(&c).cloned());
-                }
-                let known: Vec<KnownSpeaker> = state
-                    .store
-                    .list_speakers()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|s| !s.embedding.is_empty())
-                    .map(|s| KnownSpeaker { id: s.id, name: s.name, embedding: s.embedding })
-                    .collect();
-                for (cluster, label) in &names {
-                    let Some(emb) = out.embeddings.get(cluster) else { continue };
-                    let (suggested_id, suggested_score) = if Some(*cluster) == me {
-                        (None, None)
-                    } else {
-                        match best_match(emb, &known, SUGGEST_THRESHOLD) {
-                            Some((k, score)) => (Some(k.id.clone()), Some(score)),
-                            None => (None, None),
-                        }
-                    };
-                    embeddings.insert(label.clone(), emb.clone());
-                    speaker_rows.push(MeetingSpeaker {
-                        meeting_id: meeting.id.clone(),
-                        label: label.clone(),
-                        speaker_id: None,
-                        suggested_id,
-                        suggested_name: None,
-                        suggested_score,
-                    });
-                }
-            }
-            Ok(_) => log::info!("diarization found no turns"),
+    let spans: Vec<(i64, i64)> = captions.iter().map(|c| (c.start_ms, c.end_ms)).collect();
+    let (labels, speaker_rows, embeddings) = if settings.diarize_enabled && !captions.is_empty() {
+        match diarize_spans(app, &meeting.id, &dir, &spans) {
+            Ok(d) => d,
             Err(e) => {
                 log::warn!("diarization skipped: {e}");
                 if !e.contains("not downloaded") {
                     notice(app, "warning", format!("Speaker detection failed: {e}"));
+                    let _ = state.store.set_meeting_error(&meeting.id, Some(&format!("speakers: {e}")));
                 }
+                (vec![None; captions.len()], Vec::new(), BTreeMap::new())
             }
         }
-    }
+    } else {
+        (vec![None; captions.len()], Vec::new(), BTreeMap::new())
+    };
 
     let segs: Vec<NewSegment> = captions
         .iter()
@@ -192,13 +172,108 @@ pub fn run_cleanup(app: &AppHandle, meeting_id: &str) {
         Err(e) => {
             log::error!("cleanup failed: {e}");
             notice(app, "warning", format!("Transcript cleanup failed: {e}"));
+            let _ = state.store.set_meeting_error(meeting_id, Some(&format!("cleanup: {e}")));
         }
     }
+}
+
+type Diarized = (Vec<Option<String>>, Vec<MeetingSpeaker>, BTreeMap<String, Vec<f32>>);
+
+/// Run the sidecar over `mix.wav` and map its turns onto `spans` (one per
+/// transcript segment): per-segment labels, the meeting_speakers rows (with
+/// voice-memory suggestions) and the per-label embeddings.
+fn diarize_spans(app: &AppHandle, meeting_id: &str, dir: &Path, spans: &[(i64, i64)]) -> Result<Diarized, String> {
+    let state = app.state::<AppState>();
+    let settings = state.settings.read().clone();
+    let out = run_diarize_sidecar(&state, &dir.join("mix.wav"))?;
+    if out.turns.is_empty() {
+        return Err("no speech turns found".into());
+    }
+    let turns = out.turns;
+    let clusters = assign_clusters(spans, &turns);
+    let me = me_cluster(dir, &turns);
+    let names = cluster_names(&clusters, me, &settings.user_name);
+    let labels: Vec<Option<String>> = clusters.iter().map(|c| c.and_then(|c| names.get(&c).cloned())).collect();
+    let known: Vec<KnownSpeaker> = state
+        .store
+        .list_speakers()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|s| !s.embedding.is_empty())
+        .map(|s| KnownSpeaker { id: s.id, name: s.name, embedding: s.embedding })
+        .collect();
+    let mut rows = Vec::new();
+    let mut embeddings = BTreeMap::new();
+    for (cluster, label) in &names {
+        let Some(emb) = out.embeddings.get(cluster) else { continue };
+        let (suggested_id, suggested_score) = if Some(*cluster) == me {
+            (None, None)
+        } else {
+            match best_match(emb, &known, SUGGEST_THRESHOLD) {
+                Some((k, score)) => (Some(k.id.clone()), Some(score)),
+                None => (None, None),
+            }
+        };
+        embeddings.insert(label.clone(), emb.clone());
+        rows.push(MeetingSpeaker {
+            meeting_id: meeting_id.to_string(),
+            label: label.clone(),
+            speaker_id: None,
+            suggested_id,
+            suggested_name: None,
+            suggested_score,
+        });
+    }
+    Ok((labels, rows, embeddings))
+}
+
+/// Re-run only speaker detection over the stored transcript.
+pub fn rediarize(app: &AppHandle, meeting_id: &str) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let dir = state.store.recordings_dir(meeting_id);
+    let emit = |stage: &'static str, progress: f32, error: Option<String>| {
+        let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting_id.to_string(), stage, progress, error });
+    };
+    emit("diarize", 0.45, None);
+    let segs = state.store.segments(meeting_id).map_err(|e| e.to_string())?;
+    let spans: Vec<(i64, i64)> = segs.iter().map(|s| (s.start_ms, s.end_ms)).collect();
+    match diarize_spans(app, meeting_id, &dir, &spans) {
+        Ok((labels, rows, embeddings)) => {
+            let updates: Vec<(i64, Option<String>)> = segs.iter().zip(labels).map(|(s, l)| (s.id, l)).collect();
+            state.store.set_segment_speakers(meeting_id, &updates).map_err(|e| e.to_string())?;
+            let _ = state.store.set_meeting_speakers(meeting_id, &rows);
+            let _ = state.store.set_setting(&format!("speaker_embeddings:{meeting_id}"), &embeddings);
+            let _ = state.store.set_meeting_error(meeting_id, None);
+            let _ = state.store.rebuild_chunks(meeting_id);
+            let _ = crate::embed_stage::embed_meeting(app, meeting_id);
+            emit("done", 1.0, None);
+            Ok(())
+        }
+        Err(e) => {
+            let _ = state.store.set_meeting_error(meeting_id, Some(&format!("speakers: {e}")));
+            emit("done", 1.0, Some(e.clone()));
+            Err(e)
+        }
+    }
+}
+
+/// Rebuild retrieval chunks and their embeddings.
+pub fn reembed(app: &AppHandle, meeting_id: &str) -> Result<usize, String> {
+    let state = app.state::<AppState>();
+    let emit = |stage: &'static str, progress: f32, error: Option<String>| {
+        let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting_id.to_string(), stage, progress, error });
+    };
+    emit("embed", 0.5, None);
+    state.store.rebuild_chunks(meeting_id).map_err(|e| e.to_string())?;
+    let r = crate::embed_stage::embed_meeting(app, meeting_id);
+    emit("done", 1.0, r.as_ref().err().cloned());
+    r
 }
 
 fn fail(state: &AppState, meeting: &mut Meeting, emit: &dyn Fn(&'static str, f32, Option<String>), err: String) {
     log::error!("post-process {}: {err}", meeting.id);
     meeting.status = MeetingStatus::Failed;
+    meeting.error = Some(err.clone());
     let _ = state.store.update_meeting(meeting);
     emit("failed", 1.0, Some(err));
 }

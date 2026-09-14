@@ -48,6 +48,20 @@ impl Store {
         Ok(())
     }
 
+    /// Replace the speaker label of individual segments.
+    pub fn set_segment_speakers(&self, meeting_id: &str, updates: &[(i64, Option<String>)]) -> Result<()> {
+        let mut conn = self.conn.lock();
+        let tx = conn.transaction()?;
+        {
+            let mut st = tx.prepare("UPDATE segments SET speaker = ?3 WHERE meeting_id = ?1 AND id = ?2")?;
+            for (id, sp) in updates {
+                st.execute(params![meeting_id, id, sp])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn segments(&self, meeting_id: &str) -> Result<Vec<Segment>> {
         let conn = self.conn.lock();
         let mut st = conn.prepare(

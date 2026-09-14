@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, FolderOpen, Pencil, RefreshCw, Share2, Sparkles, Tag as TagIcon, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, FolderOpen, Pencil, RefreshCw, Share2, Sparkles, Tag as TagIcon, Trash2, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -6,9 +6,19 @@ import { Markdown } from "@/components/Markdown";
 import { Player, type PlayerHandle } from "@/components/Player";
 import { ShareDialog } from "@/components/ShareDialog";
 import { Transcript } from "@/components/Transcript";
-import { Badge, Button, Input, SectionTitle, Spinner } from "@/components/ui";
+import { Badge, Button, Input, Menu, SectionTitle, Spinner } from "@/components/ui";
 import { appLabel, fmtDate, fmtDuration, fmtTime } from "@/lib/format";
-import { cmd, subscribe, type Folder, type MeetingDetail, type Summary, type Tag, type Template } from "@/lib/ipc";
+import { cmd, subscribe, type Folder, type MeetingDetail, type ModelRow, type Summary, type Tag, type Template } from "@/lib/ipc";
+
+const STAGE_LABEL: Record<string, string> = {
+  mux: "Finalising video",
+  transcribe: "Transcribing",
+  diarize: "Detecting speakers",
+  cleanup: "Cleaning up the transcript",
+  embed: "Indexing for search",
+  title: "Naming the meeting",
+  summary: "Writing the summary",
+};
 
 export function MeetingPage() {
   const { id = "" } = useParams();
@@ -20,6 +30,7 @@ export function MeetingPage() {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [stage, setStage] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const [view, setView] = useState<"clean" | "raw" | null>(null);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [tab, setTab] = useState<"transcript" | "summary" | "chat">("transcript");
@@ -30,6 +41,7 @@ export function MeetingPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tagDraft, setTagDraft] = useState("");
+  const [asrModels, setAsrModels] = useState<ModelRow[]>([]);
   const player = useRef<PlayerHandle>(null);
 
   const load = useCallback(() => {
@@ -48,6 +60,7 @@ export function MeetingPage() {
 
   useEffect(() => {
     void cmd.listTemplates().then(setTemplates);
+    void cmd.listModels().then((ms) => setAsrModels(ms.filter((m) => m.spec.kind === "asr" && m.present)));
   }, []);
 
   useEffect(() => {
@@ -55,7 +68,8 @@ export function MeetingPage() {
     return subscribe("processing", (p) => {
       if (p.meeting_id !== id) return;
       setStage(p.stage === "done" || p.stage === "failed" ? null : p.stage);
-      if (p.stage === "done" || p.stage === "failed") load();
+      setProgress(p.progress);
+      if (p.stage === "done" || p.stage === "failed" || p.stage === "title") load();
     });
   }, [id, load]);
 
@@ -177,22 +191,57 @@ export function MeetingPage() {
               <input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} placeholder="add tag" className="w-20 bg-transparent text-[12px] outline-none placeholder:text-ink-3" />
             </form>
           </div>
+          {m.participants.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-3" title="Attendees seen in the meeting window or calendar event">
+              <Users size={12} />
+              {m.participants.map((p) => (
+                <span key={p} className="rounded-full border border-line px-2 py-0.5 text-ink-2">{p}</span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button variant="outline" size="sm" onClick={() => setShare(true)} disabled={m.status === "recording"}>
             <Share2 size={14} /> Share
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => void cmd.retranscribe(m.id)} disabled={processing} title="Run transcription and speaker detection again">
-            <RefreshCw size={14} /> Re-transcribe
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => void cmd.rerunCleanup(m.id)} disabled={processing || detail.segments.length === 0} title="Run the AI cleanup pass again">
-            <Sparkles size={14} /> Clean up
-          </Button>
+          <Menu
+            label={<><RefreshCw size={14} /> Re-run</>}
+            disabled={processing || m.status === "recording"}
+            items={[
+              { label: "Everything (transcribe, speakers, clean up, summary)", onSelect: () => void cmd.retranscribe(m.id) },
+              ...asrModels.map((am) => ({ label: `Transcribe with ${am.spec.name}`, onSelect: () => void cmd.retranscribe(m.id, am.spec.id) })),
+              { label: "Speaker detection only", onSelect: () => void cmd.rediarize(m.id), disabled: detail.segments.length === 0 },
+              { label: "AI clean-up only", onSelect: () => void cmd.rerunCleanup(m.id), disabled: detail.segments.length === 0 },
+              { label: "Search index (embeddings)", onSelect: () => void cmd.reembed(m.id), disabled: detail.segments.length === 0 },
+              { label: "Summary", onSelect: () => { setTab("summary"); void cmd.generateSummary(m.id, templateId || undefined); }, disabled: detail.segments.length === 0 },
+            ]}
+          />
           <Button variant="danger" size="sm" onClick={() => void remove()}>
             <Trash2 size={14} /> Delete
           </Button>
         </div>
       </header>
+
+      {(m.status === "failed" || m.error) && !processing && (
+        <div className="mb-5 flex items-start gap-3 rounded-lg border border-ember/30 bg-ember-soft/40 px-4 py-3 text-[13px]">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-ember" />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-ink">{m.status === "failed" ? "Processing failed" : "One step had a problem"}</div>
+            <div className="mt-0.5 break-words text-ink-2">{m.error ?? "Unknown error"}</div>
+            <div className="mt-1 text-[12px] text-ink-3">Logs are in the Hark data folder under <code>logs/</code>. Missing models can be downloaded in Settings.</div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void cmd.retranscribe(m.id)}>
+            <RefreshCw size={14} /> Retry
+          </Button>
+        </div>
+      )}
+      {processing && (
+        <div className="mb-5 flex items-center gap-3 rounded-lg border border-line bg-canvas-2 px-4 py-2.5 text-[13px] text-ink-2">
+          <Spinner className="h-3.5 w-3.5" />
+          <span>{STAGE_LABEL[stage ?? ""] ?? stage ?? "Processing"}</span>
+          <span className="ml-auto h-1.5 w-40 overflow-hidden rounded-full bg-line"><span className="block h-full bg-ink transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} /></span>
+        </div>
+      )}
 
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8">
         <div className="sticky top-6 self-start">

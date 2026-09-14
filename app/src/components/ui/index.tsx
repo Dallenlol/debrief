@@ -1,8 +1,9 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 import { dbToLevel } from "@/lib/format";
 
-export { Button } from "./Button";
+import { Button } from "./Button";
+export { Button };
 
 export function Toggle({ checked, onChange, label, description }: { checked: boolean; onChange: (v: boolean) => void; label: string; description?: string }) {
   return (
@@ -115,5 +116,54 @@ export function Spinner({ className }: { className?: string }) {
       className={cn("inline-block h-4 w-4 animate-spin rounded-full border-2 border-line-2 border-t-ink", className)}
       aria-label="loading"
     />
+  );
+}
+
+/** Small click-to-open action menu. Items render as buttons; closes on select, Escape or outside click. */
+export function Menu({ label, items, className, disabled }: { label: ReactNode; items: { label: ReactNode; onSelect: () => void; disabled?: boolean; danger?: boolean }[]; className?: string; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className={cn("relative", className)}>
+      <Button variant="ghost" size="sm" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((o) => !o)}>
+        {label}
+      </Button>
+      {open && (
+        <div role="menu" className="absolute right-0 z-20 mt-1 min-w-48 rounded-md border border-line bg-canvas p-1 shadow-card">
+          {items.map((it, i) => (
+            <button
+              key={i}
+              role="menuitem"
+              disabled={it.disabled}
+              onClick={() => {
+                setOpen(false);
+                it.onSelect();
+              }}
+              className={cn(
+                "focus-ring block w-full rounded px-2.5 py-1.5 text-left text-[13px] hover:bg-canvas-2 disabled:opacity-40",
+                it.danger ? "text-ember" : "text-ink",
+              )}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

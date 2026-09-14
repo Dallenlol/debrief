@@ -1,0 +1,20 @@
+[package]
+name = "hark-llm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+cuda = ["llama-cpp-2/cuda"]
+metal = ["llama-cpp-2/metal"]
+
+[dependencies]
+llama-cpp-2 = { version = "0.1.156", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "blocking", "stream"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+encoding_rs = "0.8"

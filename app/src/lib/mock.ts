@@ -105,6 +105,7 @@ const table: Record<string, (args: Record<string, unknown>) => unknown> = {
   chat_messages: () => chatMsgs,
   list_shares: () => [],
   list_audio_devices: () => ({ inputs: [], outputs: [] }),
+  list_known_speakers: () => [{ id: "s1", name: "Sarah Chen" }, { id: "s2", name: "Priya Patel" }],
   list_video_sources: () => [
     { target: { kind: "monitor", index: 0 }, label: "DISPLAY1 (2560x1440), primary", is_meeting: false },
     { target: { kind: "monitor", index: 1 }, label: "DISPLAY2 (1920x1080)", is_meeting: false },

@@ -62,7 +62,7 @@ export function MeetingPage() {
   useEffect(() => {
     void cmd.listTemplates().then(setTemplates);
     void cmd.listModels().then((ms) => setAsrModels(ms.filter((m) => m.spec.kind === "asr" && m.present)));
-    void cmd.listKnownSpeakers().then((ks) => setKnownSpeakers(ks.map((k) => k.name)));
+    void cmd.listKnownSpeakers().then((ks) => setKnownSpeakers((ks ?? []).map((k) => k.name))).catch(() => {});
   }, []);
 
   useEffect(() => subscribe("participants", (p) => {

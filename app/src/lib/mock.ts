@@ -105,6 +105,11 @@ const table: Record<string, (args: Record<string, unknown>) => unknown> = {
   chat_messages: () => chatMsgs,
   list_shares: () => [],
   list_audio_devices: () => ({ inputs: [], outputs: [] }),
+  list_video_sources: () => [
+    { target: { kind: "monitor", index: 0 }, label: "DISPLAY1 (2560x1440), primary", is_meeting: false },
+    { target: { kind: "monitor", index: 1 }, label: "DISPLAY2 (1920x1080)", is_meeting: false },
+    { target: { kind: "window", title: "Zoom Meeting" }, label: "Zoom Meeting", is_meeting: true },
+  ],
   sample_levels: () => [-30 + Math.random() * 10, -28 + Math.random() * 12],
   probe_hardware: () => ({ hardware: { cpu_cores: 16, cpu_name: "Ryzen 9 5900X", ram_gb: 31.2, gpu: { name: "NVIDIA GeForce RTX 3080", vram_gb: 10, backend: "cuda" }, os: "windows", arch: "x86_64" }, tier: "gpu", effective_tier: "gpu" }),
   list_models: () => [],

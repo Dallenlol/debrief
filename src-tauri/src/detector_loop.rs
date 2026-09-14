@@ -80,7 +80,7 @@ fn run(app: AppHandle) {
                     event: crate::calendar::current_event(&app.state::<AppState>()).map(|e| e.title),
                 },
             );
-            windows::show_popup(&app);
+            windows::show_popup_near(&app, d.hwnd);
         }
     }
 }

@@ -85,6 +85,12 @@ export interface SearchHit {
 export type VideoTarget = { kind: "monitor"; index: number } | { kind: "window"; title: string };
 export type Tier = "cpu_low" | "cpu_high" | "gpu";
 
+export interface VideoSource {
+  target: VideoTarget;
+  label: string;
+  is_meeting: boolean;
+}
+
 export interface Settings {
   onboarded: boolean;
   user_name: string;
@@ -254,6 +260,7 @@ export const cmd = {
   renameMeeting: (id: string, title: string) => invoke<Meeting>("rename_meeting", { id, title }),
   deleteMeeting: (id: string) => invoke<void>("delete_meeting", { id }),
   search: (query: string, limit = 50) => invoke<SearchHit[]>("search", { query, limit }),
+  listVideoSources: (meetingApp?: string | null) => invoke<VideoSource[]>("list_video_sources", { meetingApp: meetingApp ?? null }),
   listUpcoming: (hours?: number) => invoke<CalEvent[]>("list_upcoming", { hours }),
   refreshCalendar: () => invoke<string[]>("refresh_calendar"),
   retranscribe: (id: string, model?: string | null) => invoke<void>("retranscribe", { id, model: model ?? null }),

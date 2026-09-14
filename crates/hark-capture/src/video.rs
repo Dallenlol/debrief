@@ -1,6 +1,7 @@
 //! Screen video via an ffmpeg sidecar. Argument builders are pure and tested;
 //! `VideoRecorder` just runs the process and stops it cleanly.
 
+use crate::monitors::MonitorInfo;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -45,18 +46,34 @@ fn common_encode_args(out: &Path, max_height: u32) -> Vec<String> {
 }
 
 /// ffmpeg arguments to capture `target` to a fragmented MP4 at `fps`.
-pub fn ffmpeg_capture_args(target: &VideoTarget, out: &Path, fps: u32, max_height: u32) -> Vec<String> {
+/// `monitor` is the resolved display for `VideoTarget::Monitor` (geometry on
+/// Windows, avfoundation device on macOS); `None` captures the whole desktop.
+pub fn ffmpeg_capture_args(target: &VideoTarget, monitor: Option<&MonitorInfo>, out: &Path, fps: u32, max_height: u32) -> Vec<String> {
     let mut args: Vec<String> = vec!["-hide_banner".into(), "-loglevel".into(), "error".into()];
     if cfg!(windows) {
         args.extend(["-f".into(), "gdigrab".into(), "-framerate".into(), fps.to_string(), "-draw_mouse".into(), "1".into()]);
         match target {
-            VideoTarget::Monitor { .. } => args.extend(["-i".into(), "desktop".into()]),
+            VideoTarget::Monitor { .. } => {
+                if let Some(m) = monitor.filter(|m| m.width > 0 && m.height > 0) {
+                    args.extend([
+                        "-offset_x".into(),
+                        m.x.to_string(),
+                        "-offset_y".into(),
+                        m.y.to_string(),
+                        "-video_size".into(),
+                        format!("{}x{}", m.width, m.height),
+                    ]);
+                }
+                args.extend(["-i".into(), "desktop".into()]);
+            }
             VideoTarget::Window { title } => args.extend(["-i".into(), format!("title={title}")]),
         }
     } else if cfg!(target_os = "macos") {
-        let index = match target {
-            VideoTarget::Monitor { index } => *index,
-            VideoTarget::Window { .. } => 0,
+        let index = match (target, monitor) {
+            (VideoTarget::Monitor { .. }, Some(m)) => m.device,
+            (VideoTarget::Monitor { index }, None) => *index,
+            (VideoTarget::Window { .. }, Some(m)) => m.device,
+            (VideoTarget::Window { .. }, None) => 0,
         };
         args.extend([
             "-f".into(),
@@ -138,8 +155,12 @@ pub struct VideoRecorder {
 
 impl VideoRecorder {
     pub fn start(ffmpeg: &Path, target: &VideoTarget, out: &Path, fps: u32, max_height: u32) -> std::io::Result<VideoRecorder> {
+        let monitor = match target {
+            VideoTarget::Monitor { index } => crate::monitors::list_monitors(Some(ffmpeg)).into_iter().find(|m| m.index == *index),
+            VideoTarget::Window { .. } => None,
+        };
         let child = Command::new(ffmpeg)
-            .args(ffmpeg_capture_args(target, out, fps, max_height))
+            .args(ffmpeg_capture_args(target, monitor.as_ref(), out, fps, max_height))
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -185,7 +206,7 @@ mod tests {
     #[test]
     fn capture_args_use_platform_grabber_and_fragmented_mp4() {
         let out = Path::new("out.mp4");
-        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 0 }, out, 15, 1080);
+        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 0 }, None, out, 15, 1080);
         let joined = a.join(" ");
         if cfg!(windows) {
             assert!(joined.contains("-f gdigrab"));
@@ -202,9 +223,20 @@ mod tests {
 
     #[test]
     fn window_target_on_windows_uses_title() {
-        let a = ffmpeg_capture_args(&VideoTarget::Window { title: "Zoom Meeting".into() }, Path::new("o.mp4"), 10, 720);
+        let a = ffmpeg_capture_args(&VideoTarget::Window { title: "Zoom Meeting".into() }, None, Path::new("o.mp4"), 10, 720);
         if cfg!(windows) {
             assert!(a.contains(&"title=Zoom Meeting".to_string()));
+        }
+    }
+
+    #[test]
+    fn monitor_geometry_selects_a_region() {
+        let m = MonitorInfo { index: 1, name: "DISPLAY2".into(), x: -1920, y: 0, width: 1920, height: 1080, primary: false, device: 2 };
+        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 1 }, Some(&m), Path::new("o.mp4"), 10, 720).join(" ");
+        if cfg!(windows) {
+            assert!(a.contains("-offset_x -1920 -offset_y 0 -video_size 1920x1080 -i desktop"));
+        } else if cfg!(target_os = "macos") {
+            assert!(a.contains("-i 2:none"));
         }
     }
 

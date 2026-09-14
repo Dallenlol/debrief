@@ -1,19 +1,27 @@
 import { Circle, Video, VideoOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";
-import { cmd, subscribe, type Events } from "@/lib/ipc";
+import { cmd, subscribe, type Events, type VideoSource, type VideoTarget } from "@/lib/ipc";
 
 /** "Call detected - Record?" window. Nothing happens unless Record is clicked. */
 export function Popup() {
   const [det, setDet] = useState<Events["detection"] | null>(null);
   const [video, setVideo] = useState(true);
   const [left, setLeft] = useState(30);
+  const [sources, setSources] = useState<VideoSource[]>([]);
+  const [target, setTarget] = useState<VideoTarget | null>(null);
+
+  const keyOf = (t: VideoTarget) => (t.kind === "monitor" ? `m:${t.index}` : `w:${t.title}`);
 
   useEffect(() => {
     void cmd.getSettings().then((s) => setVideo(s.video_enabled));
     return subscribe("detection", (d) => {
       setDet(d);
       setLeft(30);
+      void cmd.listVideoSources(d.app === "unknown" ? null : d.app).then((s) => {
+        setSources(s);
+        setTarget(s.find((x) => x.is_meeting)?.target ?? s[0]?.target ?? null);
+      });
     });
   }, []);
 
@@ -29,7 +37,7 @@ export function Popup() {
 
   const record = async () => {
     if (!det) return;
-    await cmd.startRecording({ app: det.app === "unknown" ? undefined : det.app, video });
+    await cmd.startRecording({ app: det.app === "unknown" ? undefined : det.app, video, target: video && target ? target : undefined });
   };
 
   if (!det) return <div className="h-full" />;
@@ -53,6 +61,21 @@ export function Popup() {
           {video ? <Video size={12} /> : <VideoOff size={12} />} {video ? "Screen on" : "Audio only"}
         </button>
       </div>
+      {video && sources.length > 0 && (
+        <label className="mt-2 flex items-center gap-2 text-[11px] text-ink-3">
+          <span className="shrink-0">Screen</span>
+          <select
+            aria-label="Screen to record"
+            value={target ? keyOf(target) : ""}
+            onChange={(e) => setTarget(sources.find((s) => keyOf(s.target) === e.target.value)?.target ?? null)}
+            className="focus-ring h-6 min-w-0 flex-1 truncate rounded border border-line-2 bg-canvas px-1.5 text-[11px] text-ink"
+          >
+            {sources.map((s) => (
+              <option key={keyOf(s.target)} value={keyOf(s.target)}>{s.target.kind === "monitor" ? "Display: " : "Window: "}{s.label}</option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="mt-auto flex items-center gap-2">
         <Button variant="ember" size="md" className="flex-1" onClick={() => void record()}>
           <Circle size={12} fill="currentColor" /> Record

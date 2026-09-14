@@ -136,6 +136,7 @@ pub fn run() {
             commands::organize::export_html,
             commands::organize::change_data_dir,
             commands::devices::list_audio_devices,
+            commands::devices::list_video_sources,
             commands::devices::sample_levels,
         ])
         .run(tauri::generate_context!())

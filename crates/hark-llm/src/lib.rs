@@ -3,10 +3,12 @@
 //! cleanup pass built on top.
 
 pub mod backend;
+pub mod chat;
 pub mod cleanup;
 pub mod llama;
 pub mod openai;
 pub mod prompts;
+pub mod summary;
 
 pub use backend::{ChatMessage, GenOptions, LlmBackend, LlmError, Role};
 pub use llama::LlamaEngine;

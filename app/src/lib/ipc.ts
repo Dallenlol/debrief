@@ -123,6 +123,8 @@ export interface Settings {
   share_port: number;
   calendar_sources: string[];
   calendar_refresh_min: number;
+  webhook_url: string;
+  webhook_enabled: boolean;
 }
 
 export interface Template {
@@ -260,6 +262,7 @@ export const cmd = {
   renameMeeting: (id: string, title: string) => invoke<Meeting>("rename_meeting", { id, title }),
   deleteMeeting: (id: string) => invoke<void>("delete_meeting", { id }),
   search: (query: string, limit = 50) => invoke<SearchHit[]>("search", { query, limit }),
+  testWebhook: (url: string) => invoke<number>("test_webhook", { url }),
   listVideoSources: (meetingApp?: string | null) => invoke<VideoSource[]>("list_video_sources", { meetingApp: meetingApp ?? null }),
   listUpcoming: (hours?: number) => invoke<CalEvent[]>("list_upcoming", { hours }),
   refreshCalendar: () => invoke<string[]>("refresh_calendar"),

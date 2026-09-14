@@ -11,6 +11,7 @@ mod smoke;
 mod state;
 mod summary_stage;
 mod tray;
+mod webhook;
 mod windows;
 
 use state::AppState;
@@ -93,6 +94,7 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::set_settings,
             commands::settings::data_info,
+            commands::settings::test_webhook,
             commands::models::probe_hardware,
             commands::models::list_models,
             commands::models::download_model,

@@ -135,6 +135,12 @@ pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) 
         run_summary(app, &meeting.id, None);
     }
     emit("done", 1.0, None);
+    if settings.webhook_enabled {
+        match crate::webhook::fire(app, &meeting.id) {
+            Ok(status) => log::info!("webhook delivered ({status})"),
+            Err(e) => notice(app, "warning", format!("Webhook failed: {e}")),
+        }
+    }
 }
 pub use crate::summary_stage::run_summary;
 

@@ -19,6 +19,7 @@ export function SettingsPage() {
   const [calendarDraft, setCalendarDraft] = useState("");
   const [calendarErrors, setCalendarErrors] = useState<string[]>([]);
   const [calendarCount, setCalendarCount] = useState<number | null>(null);
+  const [webhookMsg, setWebhookMsg] = useState("");
   const [progress, setProgress] = useState<Record<string, { done: number; total: number; error?: string | null }>>({});
   const [data, setData] = useState<{ data_dir: string; recordings_bytes: number; models_bytes: number } | null>(null);
   const [hotkeyDraft, setHotkeyDraft] = useState("");
@@ -317,6 +318,21 @@ export function SettingsPage() {
             {calendarCount !== null && <span className="text-ink-3">{calendarCount} events in the next 7 days</span>}
           </div>
           {calendarErrors.map((e) => <div key={e} className="mt-2 text-ember">{e}</div>)}
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle hint="Push finished meetings into Zapier, n8n, Make, a CRM, or your own script">Webhook</SectionTitle>
+        <Card className="divide-y divide-line px-5 text-[13px]">
+          <Toggle label="Send each finished meeting to a URL" description="POSTs JSON with the meeting, summary, transcript and attendees once processing ends. Nothing is sent unless this is on." checked={s.webhook_enabled} onChange={(v) => void update({ webhook_enabled: v })} />
+          <div className="py-4">
+            <span className="mb-1 block text-[12px] font-medium text-ink-2">URL</span>
+            <div className="flex gap-2">
+              <Input value={s.webhook_url} placeholder="https://hooks.zapier.com/hooks/catch/..." onChange={(e) => setS({ ...s, webhook_url: e.target.value })} onBlur={() => void update({ webhook_url: s.webhook_url })} className="font-mono text-[12px]" />
+              <Button variant="outline" size="md" className="shrink-0" disabled={!s.webhook_url.trim()} onClick={() => void cmd.testWebhook(s.webhook_url).then((st) => setWebhookMsg(`OK (HTTP ${st})`), (e) => setWebhookMsg(String(e)))}>Send test</Button>
+            </div>
+            {webhookMsg && <div className={`mt-1.5 text-[12px] ${webhookMsg.startsWith("OK") ? "text-moss" : "text-ember"}`}>{webhookMsg}</div>}
+          </div>
         </Card>
       </section>
 

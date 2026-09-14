@@ -22,6 +22,12 @@ pub fn set_settings(app: AppHandle, new: Settings) -> CmdResult<Settings> {
     Ok(new)
 }
 
+/// POST a `test` event to `url`; returns the HTTP status.
+#[tauri::command]
+pub async fn test_webhook(url: String) -> CmdResult<u16> {
+    tauri::async_runtime::spawn_blocking(move || crate::webhook::test(&url)).await.map_err(|e| e.to_string())?
+}
+
 #[derive(Serialize)]
 pub struct DataInfo {
     pub data_dir: String,

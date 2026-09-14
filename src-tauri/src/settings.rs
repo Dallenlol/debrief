@@ -41,6 +41,9 @@ pub struct Settings {
     /// .ics URLs (Google "secret address", Outlook "publish calendar") or local files.
     pub calendar_sources: Vec<String>,
     pub calendar_refresh_min: u64,
+    /// POST each finished meeting (summary + transcript) here. Off unless enabled.
+    pub webhook_url: String,
+    pub webhook_enabled: bool,
 }
 
 impl Default for Settings {
@@ -77,6 +80,8 @@ impl Default for Settings {
             share_port: 47123,
             calendar_sources: Vec::new(),
             calendar_refresh_min: 15,
+            webhook_url: String::new(),
+            webhook_enabled: false,
         }
     }
 }

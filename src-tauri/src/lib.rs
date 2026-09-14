@@ -1,6 +1,7 @@
 mod commands;
 mod detector_loop;
 mod events;
+mod pipeline;
 mod recorder;
 mod settings;
 mod shortcuts;
@@ -78,6 +79,13 @@ pub fn run() {
             commands::models::download_model,
             commands::models::cancel_download,
             commands::models::remove_model,
+            commands::speakers::meeting_speakers,
+            commands::speakers::rename_speaker,
+            commands::speakers::accept_speaker_suggestion,
+            commands::speakers::list_known_speakers,
+            commands::speakers::delete_known_speaker,
+            commands::speakers::rerun_cleanup,
+            commands::speakers::test_llm_endpoint,
             commands::devices::list_audio_devices,
             commands::devices::sample_levels,
         ])

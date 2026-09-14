@@ -1,7 +1,7 @@
 use super::{err, CmdResult};
 use crate::recorder;
 use crate::state::AppState;
-use hark_store::{Meeting, SearchHit, Segment};
+use hark_store::{Meeting, MeetingSpeaker, SearchHit, Segment};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
@@ -17,6 +17,7 @@ pub struct MeetingDetail {
     pub segments: Vec<Segment>,
     pub media: Media,
     pub highlights: Vec<u64>,
+    pub speakers: Vec<MeetingSpeaker>,
 }
 
 #[tauri::command]
@@ -35,7 +36,8 @@ pub fn get_meeting(state: State<AppState>, id: String) -> CmdResult<MeetingDetai
         video: video.exists().then(|| video.to_string_lossy().into_owned()),
     };
     let highlights = state.store.get_setting::<Vec<u64>>(&format!("highlights:{id}")).map_err(err)?.unwrap_or_default();
-    Ok(MeetingDetail { meeting, segments, media, highlights })
+    let speakers = state.store.meeting_speakers(&id).map_err(err)?;
+    Ok(MeetingDetail { meeting, segments, media, highlights, speakers })
 }
 
 #[tauri::command]

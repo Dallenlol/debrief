@@ -28,6 +28,13 @@ pub struct Settings {
     pub never_apps: Vec<String>,
     pub popup_timeout_secs: u64,
     pub close_to_tray: bool,
+    /// "bundled" (llama.cpp in-process) or "openai" (any OpenAI-compatible endpoint).
+    pub llm_backend: String,
+    pub llm_endpoint: String,
+    pub llm_endpoint_model: String,
+    pub llm_api_key: Option<String>,
+    pub cleanup_enabled: bool,
+    pub diarize_enabled: bool,
 }
 
 impl Default for Settings {
@@ -53,6 +60,12 @@ impl Default for Settings {
             never_apps: Vec::new(),
             popup_timeout_secs: 30,
             close_to_tray: true,
+            llm_backend: "bundled".into(),
+            llm_endpoint: "http://localhost:11434/v1".into(),
+            llm_endpoint_model: "qwen3:8b".into(),
+            llm_api_key: None,
+            cleanup_enabled: true,
+            diarize_enabled: true,
         }
     }
 }

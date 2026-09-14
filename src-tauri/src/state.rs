@@ -1,6 +1,7 @@
 use crate::recorder::ActiveRecording;
 use crate::settings::Settings;
 use hark_asr::WhisperEngine;
+use hark_llm::LlmBackend;
 use hark_models::{Catalog, Hardware};
 use hark_store::Store;
 use parking_lot::{Mutex, RwLock};
@@ -14,6 +15,8 @@ use std::time::Instant;
 #[derive(Default)]
 pub struct Engines {
     pub whisper: HashMap<String, Arc<WhisperEngine>>,
+    /// (backend key, backend) - key changes when settings change.
+    pub llm: Option<(String, Arc<dyn LlmBackend>)>,
     pub last_used: Option<Instant>,
 }
 
@@ -28,6 +31,7 @@ pub struct AppState {
     pub detection_paused: AtomicBool,
     pub snooze_until: Mutex<Option<Instant>>,
     pub ffmpeg: Option<PathBuf>,
+    pub diarize_bin: Option<PathBuf>,
     /// Model downloads in flight; value = cancel flag.
     pub downloads: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
@@ -44,7 +48,8 @@ impl AppState {
             engines: Mutex::new(Engines::default()),
             detection_paused: AtomicBool::new(false),
             snooze_until: Mutex::new(None),
-            ffmpeg: find_ffmpeg(),
+            ffmpeg: find_sidecar("ffmpeg"),
+            diarize_bin: find_sidecar("hark-diarize"),
             downloads: Mutex::new(HashMap::new()),
         }
     }
@@ -71,6 +76,7 @@ impl AppState {
         }
         let path = self.model_file(model_id)?;
         let use_gpu = self.hardware.gpu.is_some();
+        log::info!("loading whisper {model_id} from {}", path.display());
         match WhisperEngine::load(&path, use_gpu) {
             Ok(w) => {
                 let w = Arc::new(w);
@@ -104,17 +110,62 @@ impl AppState {
         candidates.into_iter().find_map(|m| self.whisper(&m.id))
     }
 
+    /// Paths needed to run the diarization sidecar, if the models are downloaded.
+    pub fn diarize_models(&self) -> Option<(PathBuf, PathBuf)> {
+        Some((self.model_file("pyannote-seg-3")?, self.model_file("titanet-small")?))
+    }
+
+    /// The configured chat model: bundled llama.cpp (if the GGUF is downloaded)
+    /// or an OpenAI-compatible endpoint. `None` when unavailable.
+    pub fn llm(&self) -> Option<Arc<dyn LlmBackend>> {
+        let s = self.settings.read().clone();
+        let tier = s.tier(&self.hardware);
+        let (_, _, llm_id) = s.model_ids(&self.catalog, tier);
+        let key = if s.llm_backend == "openai" {
+            format!("openai|{}|{}|{}", s.llm_endpoint, s.llm_endpoint_model, s.llm_api_key.is_some())
+        } else {
+            format!("bundled|{llm_id}")
+        };
+        {
+            let mut e = self.engines.lock();
+            let cached = e.llm.as_ref().filter(|(k, _)| *k == key).map(|(_, b)| b.clone());
+            if let Some(b) = cached {
+                e.last_used = Some(Instant::now());
+                return Some(b);
+            }
+        }
+        let backend: Arc<dyn LlmBackend> = if s.llm_backend == "openai" {
+            Arc::new(hark_llm::OpenAiCompat::new(&s.llm_endpoint, s.llm_api_key.as_deref(), &s.llm_endpoint_model))
+        } else {
+            let path = self.model_file(&llm_id)?;
+            let gpu_layers = if self.hardware.gpu.is_some() { 999 } else { 0 };
+            match hark_llm::LlamaEngine::load(&path, gpu_layers, 8192) {
+                Ok(e) => Arc::new(e),
+                Err(err) => {
+                    log::error!("load llm {llm_id}: {err}");
+                    return None;
+                }
+            }
+        };
+        let mut e = self.engines.lock();
+        e.llm = Some((key, backend.clone()));
+        e.last_used = Some(Instant::now());
+        Some(backend)
+    }
+
     pub fn unload_engines(&self) {
         let mut e = self.engines.lock();
         e.whisper.clear();
+        e.llm = None;
         e.last_used = None;
     }
 }
 
-/// Locate the ffmpeg sidecar: next to the executable (bundled), then the dev
-/// `src-tauri/binaries/` folder, then PATH.
-fn find_ffmpeg() -> Option<PathBuf> {
-    let exe_name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+/// Locate a sidecar binary: next to the executable (bundled), then the dev
+/// `src-tauri/binaries/` folder, then the cargo target dir, then PATH.
+fn find_sidecar(name: &str) -> Option<PathBuf> {
+    let exe_name = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
+    let exe_name = exe_name.as_str();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let p = dir.join(exe_name);
@@ -126,7 +177,7 @@ fn find_ffmpeg() -> Option<PathBuf> {
     let triple = env!("HARK_TARGET_TRIPLE");
     let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("binaries")
-        .join(format!("ffmpeg-{triple}{}", if cfg!(windows) { ".exe" } else { "" }));
+        .join(format!("{name}-{triple}{}", if cfg!(windows) { ".exe" } else { "" }));
     if dev.exists() {
         return Some(dev);
     }

@@ -1,7 +1,7 @@
 //! sherpa-onnx wrappers. Models: pyannote segmentation 3.0 + a speaker
 //! embedding model (NeMo TitaNet small by default).
 
-use crate::Turn;
+use hark_diarize::Turn;
 use sherpa_rs::diarize::{Diarize, DiarizeConfig};
 use sherpa_rs::speaker_id::{EmbeddingExtractor, ExtractorConfig};
 use std::path::Path;

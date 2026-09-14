@@ -1,13 +1,12 @@
 //! Orchestrates one recording: capture + optional video + live captions, then
 //! the post-call pipeline (mux, quality transcription).
 
-use crate::events::{self, LevelsPayload, NoticePayload, ProcessingPayload, RecordingStatePayload};
+use crate::events::{self, LevelsPayload, NoticePayload, RecordingStatePayload};
 use crate::state::AppState;
 use crate::windows;
 use hark_asr::{Caption, LiveTranscriber};
-use hark_capture::video::{ffmpeg_mux_args, run_ffmpeg};
 use hark_capture::{CaptureEvent, RecordConfig, Recorder, VideoRecorder, VideoTarget};
-use hark_store::{Meeting, MeetingStatus, NewSegment};
+use hark_store::{Meeting, MeetingStatus};
 use serde::Deserialize;
 use std::path::Path;
 use std::sync::atomic::Ordering;
@@ -60,6 +59,7 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
     let want_video = opts.video.unwrap_or(settings.video_enabled);
     let dir = state.store.recordings_dir(&meeting.id);
 
+    log::info!("recorder: opening audio devices");
     let (cap_tx, cap_rx) = crossbeam_channel::unbounded::<CaptureEvent>();
     let recorder = Recorder::start(
         RecordConfig {
@@ -98,11 +98,14 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
     };
 
     state.store.create_meeting(&meeting).map_err(|e| e.to_string())?;
+    log::info!("recorder: audio open, loading live model");
 
     // Live captions if the live model is downloaded.
     let tier = settings.tier(&state.hardware);
     let (live_id, _, _) = settings.model_ids(&state.catalog, tier);
-    let (pcm_tx, live) = match state.whisper_or_any(&[&live_id]) {
+    let live_engine = state.whisper_or_any(&[&live_id]);
+    log::info!("recorder: live model loaded={}", live_engine.is_some());
+    let (pcm_tx, live) = match live_engine {
         Some(engine) => {
             let (pcm_tx, pcm_rx) = crossbeam_channel::unbounded::<Vec<f32>>();
             let (cap_tx2, cap_rx2) = crossbeam_channel::unbounded::<Caption>();
@@ -153,9 +156,11 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
         highlights: Vec::new(),
     });
     state.detection_paused.store(true, Ordering::SeqCst);
+    log::info!("recorder: showing record bar");
     windows::hide_popup(app);
     windows::show_recordbar(app);
     emit_state(app);
+    log::info!("recorder: started {}", meeting.id);
     Ok(meeting)
 }
 
@@ -219,68 +224,8 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
 
     let app2 = app.clone();
     let m2 = meeting.clone();
-    std::thread::spawn(move || post_process(&app2, m2));
+    std::thread::spawn(move || crate::pipeline::post_process(&app2, m2));
     Ok(meeting)
-}
-
-/// Mux video, run the quality transcription pass, mark Ready/Failed.
-fn post_process(app: &AppHandle, mut meeting: Meeting) {
-    let state = app.state::<AppState>();
-    let dir = state.store.recordings_dir(&meeting.id);
-    let emit = |stage: &'static str, progress: f32, error: Option<String>| {
-        let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting.id.clone(), stage, progress, error });
-    };
-
-    emit("mux", 0.05, None);
-    let raw = dir.join("screen.raw.mp4");
-    if meeting.has_video && raw.exists() {
-        if let Some(ffmpeg) = &state.ffmpeg {
-            let mixed = dir.join("mix.wav");
-            let out = dir.join("screen.mp4");
-            match run_ffmpeg(ffmpeg, &ffmpeg_mux_args(&raw, &mixed, &out)) {
-                Ok(()) => {
-                    let _ = std::fs::remove_file(&raw);
-                }
-                Err(e) => {
-                    log::error!("mux failed: {e}");
-                    // Keep the raw (audio-less) video so nothing is lost.
-                    let _ = std::fs::rename(&raw, &out);
-                }
-            }
-        }
-    }
-
-    emit("transcribe", 0.2, None);
-    let settings = state.settings.read().clone();
-    let tier = settings.tier(&state.hardware);
-    let (live_id, quality_id, _) = settings.model_ids(&state.catalog, tier);
-    let engine = state.whisper_or_any(&[&quality_id, &live_id]);
-    let result = match engine {
-        Some(engine) => transcribe_file(&engine, &dir.join("mix.wav"), settings.language.as_deref()).and_then(|caps| {
-            let segs: Vec<NewSegment> = caps
-                .into_iter()
-                .map(|c| NewSegment { start_ms: c.start_ms, end_ms: c.end_ms, speaker: None, text: c.text })
-                .collect();
-            state.store.replace_segments(&meeting.id, &segs).map_err(|e| e.to_string())
-        }),
-        None => {
-            notice(app, "info", "Transcription skipped: no speech model downloaded. Download one in Settings and use Re-transcribe.".into());
-            Ok(())
-        }
-    };
-
-    match result {
-        Ok(()) => {
-            meeting.status = MeetingStatus::Ready;
-            let _ = state.store.update_meeting(&meeting);
-            emit("done", 1.0, None);
-        }
-        Err(e) => {
-            meeting.status = MeetingStatus::Failed;
-            let _ = state.store.update_meeting(&meeting);
-            emit("failed", 1.0, Some(e));
-        }
-    }
 }
 
 /// Re-run the quality transcription for an existing meeting (e.g. after downloading a model).
@@ -290,13 +235,8 @@ pub fn retranscribe(app: &AppHandle, meeting_id: &str) -> Result<(), String> {
     m.status = MeetingStatus::Processing;
     state.store.update_meeting(&m).map_err(|e| e.to_string())?;
     let app2 = app.clone();
-    std::thread::spawn(move || post_process(&app2, m));
+    std::thread::spawn(move || crate::pipeline::post_process(&app2, m));
     Ok(())
-}
-
-pub fn transcribe_file(engine: &hark_asr::WhisperEngine, wav: &Path, lang: Option<&str>) -> Result<Vec<Caption>, String> {
-    let pcm = read_wav_as_16k_mono(wav)?;
-    engine.transcribe(&pcm, 0, lang, true).map_err(|e| e.to_string())
 }
 
 pub fn read_wav_as_16k_mono(path: &Path) -> Result<Vec<f32>, String> {

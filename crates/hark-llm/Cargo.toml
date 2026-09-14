@@ -10,7 +10,7 @@ cuda = ["llama-cpp-2/cuda"]
 metal = ["llama-cpp-2/metal"]
 
 [dependencies]
-llama-cpp-2 = { version = "0.1.156", default-features = false }
+llama-cpp-2 = { version = "0.1.156", default-features = false, features = ["dynamic-link"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "blocking", "stream"] }
 serde.workspace = true
 serde_json.workspace = true

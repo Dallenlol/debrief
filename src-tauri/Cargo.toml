@@ -12,8 +12,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
 default = []
-cuda = ["hark-asr/cuda"]
-metal = ["hark-asr/metal"]
+cuda = ["hark-asr/cuda", "hark-llm/cuda"]
+metal = ["hark-asr/metal", "hark-llm/metal"]
 
 [build-dependencies]
 tauri-build = { version = "2.6", features = [] }
@@ -32,6 +32,8 @@ hark-detect = { path = "../crates/hark-detect" }
 hark-capture = { path = "../crates/hark-capture" }
 hark-models = { path = "../crates/hark-models" }
 hark-asr = { path = "../crates/hark-asr" }
+hark-diarize = { path = "../crates/hark-diarize" }
+hark-llm = { path = "../crates/hark-llm" }
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

@@ -24,3 +24,13 @@ opt-level = 3
 lto = "thin"
 codegen-units = 4
 strip = true
+
+# Native AI libraries must be optimised even in dev builds: a Debug ggml is 20-50x slower.
+[profile.dev.package.llama-cpp-sys-2]
+opt-level = 3
+[profile.dev.package.whisper-rs-sys]
+opt-level = 3
+[profile.dev.package.sherpa-rs-sys]
+opt-level = 3
+[profile.dev.package.hark-capture]
+opt-level = 2

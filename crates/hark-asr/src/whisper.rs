@@ -55,6 +55,13 @@ impl WhisperEngine {
     /// Transcribe 16 kHz mono f32 audio. Timestamps are shifted by `offset_ms`.
     /// `lang` is an ISO code like "en"; `None` = auto-detect.
     pub fn transcribe(&self, pcm16k: &[f32], offset_ms: i64, lang: Option<&str>, is_final: bool) -> Result<Vec<Caption>, AsrError> {
+        self.transcribe_with(pcm16k, offset_ms, lang, is_final, 0)
+    }
+
+    /// Like `transcribe`, but splits segments at word boundaries so no segment
+    /// exceeds `max_len` characters (0 = whisper's default segmentation).
+    /// Short segments make speaker assignment much more precise.
+    pub fn transcribe_with(&self, pcm16k: &[f32], offset_ms: i64, lang: Option<&str>, is_final: bool, max_len: i32) -> Result<Vec<Caption>, AsrError> {
         if pcm16k.len() < 1600 {
             return Ok(Vec::new());
         }
@@ -72,7 +79,8 @@ impl WhisperEngine {
         params.set_suppress_blank(true);
         params.set_suppress_nst(true);
         params.set_token_timestamps(true);
-        params.set_max_len(0);
+        params.set_max_len(max_len);
+        params.set_split_on_word(max_len > 0);
         state.full(params, pcm16k).map_err(|e| AsrError::Whisper(e.to_string()))?;
 
         let mut out = Vec::new();

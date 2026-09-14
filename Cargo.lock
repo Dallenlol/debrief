@@ -1850,6 +1850,8 @@ dependencies = [
  "hark-asr",
  "hark-capture",
  "hark-detect",
+ "hark-diarize",
+ "hark-llm",
  "hark-models",
  "hark-store",
  "hound",
@@ -1915,11 +1917,22 @@ dependencies = [
 name = "hark-diarize"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "hark-diarize-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hark-diarize",
  "hound",
  "serde",
+ "serde_json",
  "sherpa-rs",
  "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]

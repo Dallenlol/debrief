@@ -6,6 +6,7 @@ import { fmtDuration } from "@/lib/format";
 import { cmd, subscribe, type RecordingState } from "@/lib/ipc";
 import { Button, Kbd } from "./ui";
 import { Toasts } from "./Toasts";
+import { UpdateBanner } from "./UpdateBanner";
 
 export function Shell() {
   const [rec, setRec] = useState<RecordingState>({ state: "idle", meeting_id: null, elapsed_ms: 0 });
@@ -77,6 +78,7 @@ export function Shell() {
         <Outlet />
       </main>
       <Toasts />
+      <UpdateBanner />
     </div>
   );
 }

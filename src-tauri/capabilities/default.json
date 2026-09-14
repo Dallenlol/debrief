@@ -26,6 +26,9 @@
     "global-shortcut:allow-is-registered",
     "dialog:allow-open",
     "dialog:allow-save",
-    "opener:allow-open-path"
+    "opener:allow-open-path",
+    "updater:default",
+    "process:default",
+    "process:allow-restart"
   ]
 }

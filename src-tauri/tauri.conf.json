@@ -103,6 +103,18 @@
     },
     "publisher": "Hark contributors",
     "homepage": "https://dallenlol.github.io/hark",
-    "copyright": "MIT License"
+    "copyright": "MIT License",
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQzMjdGQUU3QjAxRkM2QkIKUldTN3hoK3c1L29uMDRvWHZGM0VYQjJkTVN5OTBnTTZzSVBkdkZQZjBQR3Jrd2NHOU9RVy9xU2QK",
+      "endpoints": [
+        "https://github.com/Dallenlol/hark/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

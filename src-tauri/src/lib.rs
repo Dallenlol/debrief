@@ -17,6 +17,18 @@ mod windows;
 use state::AppState;
 use tauri::{Manager, WindowEvent};
 
+/// Updater keyed by build variant: Windows CPU and CUDA builds look up
+/// `windows-x86_64-cpu` / `windows-x86_64-cuda` in latest.json; macOS uses the
+/// default `darwin-<arch>` key (one Metal build per architecture).
+fn updater_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R, tauri_plugin_updater::Config> {
+    let b = tauri_plugin_updater::Builder::new();
+    if cfg!(windows) {
+        b.target(format!("windows-{}-{}", std::env::consts::ARCH, env!("HARK_VARIANT"))).build()
+    } else {
+        b.build()
+    }
+}
+
 pub fn run() {
     let data_dir = hark_store::data_dir();
     let store = hark_store::Store::open(&data_dir.join("hark.db")).expect("open database");
@@ -30,6 +42,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(updater_plugin())
         .manage(app_state)
         .setup(|app| {
             let handle = app.handle().clone();

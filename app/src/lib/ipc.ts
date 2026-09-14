@@ -125,6 +125,7 @@ export interface Settings {
   calendar_refresh_min: number;
   webhook_url: string;
   webhook_enabled: boolean;
+  auto_update_check: boolean;
 }
 
 export interface Template {

@@ -6,6 +6,7 @@ import { TemplatesEditor } from "@/components/TemplatesEditor";
 import { Button, Card, Input, Meter, SectionTitle, Select, Spinner, Toggle } from "@/components/ui";
 import { appLabel, fmtBytes } from "@/lib/format";
 import { LANGUAGES } from "@/lib/languages";
+import { checkForUpdate } from "@/lib/updates";
 import { cmd, subscribe, type AudioDevice, type Hardware, type ModelRow, type Settings, type ShareInfo, type Tier } from "@/lib/ipc";
 
 const TIER_LABEL: Record<Tier, string> = { cpu_low: "CPU, light models", cpu_high: "CPU, bigger models", gpu: "GPU, best models" };
@@ -20,6 +21,7 @@ export function SettingsPage() {
   const [calendarErrors, setCalendarErrors] = useState<string[]>([]);
   const [calendarCount, setCalendarCount] = useState<number | null>(null);
   const [webhookMsg, setWebhookMsg] = useState("");
+  const [updateMsg, setUpdateMsg] = useState("");
   const [progress, setProgress] = useState<Record<string, { done: number; total: number; error?: string | null }>>({});
   const [data, setData] = useState<{ data_dir: string; recordings_bytes: number; models_bytes: number } | null>(null);
   const [hotkeyDraft, setHotkeyDraft] = useState("");
@@ -332,6 +334,17 @@ export function SettingsPage() {
               <Button variant="outline" size="md" className="shrink-0" disabled={!s.webhook_url.trim()} onClick={() => void cmd.testWebhook(s.webhook_url).then((st) => setWebhookMsg(`OK (HTTP ${st})`), (e) => setWebhookMsg(String(e)))}>Send test</Button>
             </div>
             {webhookMsg && <div className={`mt-1.5 text-[12px] ${webhookMsg.startsWith("OK") ? "text-moss" : "text-ember"}`}>{webhookMsg}</div>}
+          </div>
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle>Updates</SectionTitle>
+        <Card className="divide-y divide-line px-5 text-[13px]">
+          <Toggle label="Check for updates on startup" description="Fetches one small file from GitHub releases. Installing is always your click." checked={s.auto_update_check} onChange={(v) => void update({ auto_update_check: v })} />
+          <div className="flex items-center gap-3 py-4">
+            <Button variant="outline" size="sm" onClick={() => { setUpdateMsg("Checking..."); void checkForUpdate().then((u) => setUpdateMsg(u ? `Hark ${u.version} is available.` : "You are on the latest version.")); }}>Check for updates</Button>
+            <span className="text-ink-3">{updateMsg}</span>
           </div>
         </Card>
       </section>

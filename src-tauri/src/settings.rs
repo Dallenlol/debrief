@@ -44,6 +44,8 @@ pub struct Settings {
     /// POST each finished meeting (summary + transcript) here. Off unless enabled.
     pub webhook_url: String,
     pub webhook_enabled: bool,
+    /// Ask GitHub for a newer release on startup (only the release manifest is fetched).
+    pub auto_update_check: bool,
 }
 
 impl Default for Settings {
@@ -82,6 +84,7 @@ impl Default for Settings {
             calendar_refresh_min: 15,
             webhook_url: String::new(),
             webhook_enabled: false,
+            auto_update_check: true,
         }
     }
 }

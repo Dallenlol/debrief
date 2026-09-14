@@ -1,0 +1,51 @@
+# Built-in meeting app patterns. A window matches a pattern when its process
+# name contains any of `process` (case-insensitive) AND (its title contains any
+# of `title_any` OR matches `title_regex`). First match wins, top to bottom.
+
+[[pattern]]
+app = "zoom"
+label = "Zoom"
+process = ["zoom.exe", "zoom.us", "caphost.exe", "zoom"]
+title_any = ["Zoom Meeting", "Zoom Webinar", "Zoom Workplace"]
+
+[[pattern]]
+app = "teams"
+label = "Microsoft Teams"
+process = ["ms-teams.exe", "teams.exe", "microsoft teams", "msteams"]
+title_regex = '(?i)(\| Microsoft Teams$|^Microsoft Teams$|Meeting|Call)'
+
+[[pattern]]
+app = "meet"
+label = "Google Meet"
+process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
+title_any = ["Meet - ", "meet.google.com", "Google Meet"]
+
+[[pattern]]
+app = "webex"
+label = "Webex"
+process = ["webex", "ciscocollabhost", "atmgr"]
+title_any = ["Webex", "Cisco Webex"]
+
+[[pattern]]
+app = "discord"
+label = "Discord"
+process = ["discord"]
+title_regex = '(?i)^#?.+ \| Discord$|Voice Connected'
+
+[[pattern]]
+app = "slack"
+label = "Slack huddle"
+process = ["slack"]
+title_any = ["Huddle"]
+
+[[pattern]]
+app = "facetime"
+label = "FaceTime"
+process = ["facetime"]
+title_any = ["FaceTime"]
+
+[[pattern]]
+app = "gotomeeting"
+label = "GoToMeeting"
+process = ["g2mui", "gotomeeting", "goto"]
+title_any = ["GoTo Meeting", "GoToMeeting"]

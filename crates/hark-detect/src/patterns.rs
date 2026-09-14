@@ -195,6 +195,28 @@ title_any = ["Meet - "]
     }
 
     #[test]
+    fn browser_and_extra_apps() {
+        let p = PatternSet::builtin();
+        let cases = [
+            ("chrome.exe", "Zoom Meeting - app.zoom.us - Google Chrome", "zoom"),
+            ("firefox.exe", "Weekly sync | Microsoft Teams - teams.microsoft.com", "teams"),
+            ("brave.exe", "Whereby - Meeting room", "whereby"),
+            ("chrome.exe", "Jitsi Meet - Standup", "jitsi"),
+            ("zoom.exe", "Reunión de Zoom", "zoom"),
+            ("msedge.exe", "Meet – abc-defg-hij", "meet"),
+            ("whatsapp.exe", "Voice call with Sam", "whatsapp"),
+            ("signal.exe", "Signal call", "signal"),
+            ("ringcentral.exe", "RingCentral Video", "ringcentral"),
+            ("chrome.exe", "GoTo Meeting - app.goto.com/meeting/123", "gotomeeting"),
+        ];
+        for (proc_, title, app) in cases {
+            assert_eq!(p.match_windows(&[w(proc_, title)]).map(|d| d.app), Some(app.to_string()), "{proc_} / {title}");
+        }
+        assert!(p.match_windows(&[w("whatsapp.exe", "WhatsApp")]).is_none());
+        assert!(p.match_windows(&[w("chrome.exe", "Teams pricing - Google Chrome")]).is_none());
+    }
+
+    #[test]
     fn bad_regex_is_an_error() {
         let r = PatternSet::from_toml("[[pattern]]\napp='x'\nlabel='x'\ntitle_regex='('\n");
         assert!(matches!(r, Err(PatternError::Regex(_, _))));

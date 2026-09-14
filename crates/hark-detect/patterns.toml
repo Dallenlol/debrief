@@ -6,7 +6,7 @@
 app = "zoom"
 label = "Zoom"
 process = ["zoom.exe", "zoom.us", "caphost.exe", "zoom"]
-title_any = ["Zoom Meeting", "Zoom Webinar", "Zoom Workplace"]
+title_any = ["Zoom Meeting", "Zoom Webinar", "Zoom Workplace", "Reunión de Zoom", "Réunion Zoom", "Zoom-Meeting", "Riunione Zoom", "Reunião Zoom"]
 
 [[pattern]]
 app = "teams"
@@ -18,7 +18,7 @@ title_regex = '(?i)(\| Microsoft Teams$|^Microsoft Teams$|Meeting|Call)'
 app = "meet"
 label = "Google Meet"
 process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
-title_any = ["Meet - ", "meet.google.com", "Google Meet"]
+title_regex = '^Meet [-–] |meet\.google\.com|Google Meet'
 
 [[pattern]]
 app = "webex"
@@ -49,3 +49,95 @@ app = "gotomeeting"
 label = "GoToMeeting"
 process = ["g2mui", "gotomeeting", "goto"]
 title_any = ["GoTo Meeting", "GoToMeeting"]
+
+# --- meeting apps running in a browser tab ---
+
+[[pattern]]
+app = "zoom"
+label = "Zoom (browser)"
+process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
+title_any = ["app.zoom.us", "Zoom Meeting", "Zoom Webinar"]
+
+[[pattern]]
+app = "teams"
+label = "Microsoft Teams (browser)"
+process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
+title_any = ["teams.microsoft.com", "teams.live.com", "| Microsoft Teams"]
+
+[[pattern]]
+app = "webex"
+label = "Webex (browser)"
+process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
+title_any = ["webex.com/meet", "Webex Meeting", "Cisco Webex Meetings"]
+
+[[pattern]]
+app = "whereby"
+label = "Whereby"
+process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
+title_any = ["Whereby", "whereby.com"]
+
+[[pattern]]
+app = "jitsi"
+label = "Jitsi Meet"
+process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
+title_any = ["Jitsi Meet", "meet.jit.si"]
+
+[[pattern]]
+app = "around"
+label = "Around"
+process = ["around"]
+title_any = ["Around"]
+
+[[pattern]]
+app = "skype"
+label = "Skype"
+process = ["skype"]
+title_regex = '(?i)(call|Skype$)'
+
+[[pattern]]
+app = "ringcentral"
+label = "RingCentral"
+process = ["ringcentral", "rcv"]
+title_any = ["RingCentral Video", "RingCentral Meetings", "RingCentral"]
+
+[[pattern]]
+app = "bluejeans"
+label = "BlueJeans"
+process = ["bluejeans"]
+title_any = ["BlueJeans"]
+
+[[pattern]]
+app = "gather"
+label = "Gather"
+process = ["gather"]
+title_any = ["Gather"]
+
+[[pattern]]
+app = "butter"
+label = "Butter"
+process = ["butter"]
+title_any = ["Butter"]
+
+[[pattern]]
+app = "whatsapp"
+label = "WhatsApp call"
+process = ["whatsapp"]
+title_regex = '(?i)(call|calling|voice|video)'
+
+[[pattern]]
+app = "telegram"
+label = "Telegram call"
+process = ["telegram"]
+title_regex = '(?i)(call|calling)'
+
+[[pattern]]
+app = "signal"
+label = "Signal call"
+process = ["signal"]
+title_regex = '(?i)(call|calling)'
+
+[[pattern]]
+app = "gotomeeting"
+label = "GoTo Meeting (browser)"
+process = ["chrome", "msedge", "firefox", "brave", "arc", "safari", "vivaldi", "opera", "chromium"]
+title_any = ["app.goto.com/meeting", "GoTo Meeting"]

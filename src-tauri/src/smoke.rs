@@ -98,6 +98,18 @@ fn smoke_ai(state: &AppState, meeting_id: &str) {
         }
         std::thread::sleep(Duration::from_secs(2));
     }
+    if let Ok(Some(m)) = state.store.get_meeting(meeting_id) {
+        println!("SMOKE title: {:?} (auto={}) participants={:?} error={:?}", m.title, m.title_auto, m.participants, m.error);
+    }
+    println!("SMOKE vectors: {}", state.store.has_chunk_vectors(meeting_id).unwrap_or(false));
+    if let Some(e) = state.embed() {
+        if let Ok(q) = e.embed(&["what should citizens do for their nation"]) {
+            let hits = state.store.search_chunks_vec(&q[0], Some(meeting_id), 2).unwrap_or_default();
+            for h in hits {
+                println!("  vec hit {:.3} [{}] {}", -h.rank, h.start_ms, h.text.chars().take(80).collect::<String>());
+            }
+        }
+    }
     if std::env::var_os("HARK_SMOKE_CHAT").is_none() {
         return;
     }

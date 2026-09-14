@@ -43,6 +43,21 @@ pub struct Meeting {
     pub status: MeetingStatus,
     pub folder_id: Option<String>,
     pub created_at: DateTime<Utc>,
+    /// Last processing error (cleared when a re-run succeeds).
+    #[serde(default)]
+    pub error: Option<String>,
+    /// True until the user renames the meeting; auto-titles only replace auto titles.
+    #[serde(default = "default_true")]
+    pub title_auto: bool,
+    /// Attendee names seen in the meeting window or calendar event.
+    #[serde(default)]
+    pub participants: Vec<String>,
+    #[serde(default)]
+    pub calendar_uid: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Meeting {
@@ -60,6 +75,10 @@ impl Meeting {
             status: MeetingStatus::Recording,
             folder_id: None,
             created_at: now,
+            error: None,
+            title_auto: true,
+            participants: Vec::new(),
+            calendar_uid: None,
         }
     }
 
@@ -75,18 +94,23 @@ impl Meeting {
             status: MeetingStatus::parse(&r.get::<_, String>("status")?),
             folder_id: r.get("folder_id")?,
             created_at: r.get("created_at")?,
+            error: r.get("error")?,
+            title_auto: r.get::<_, i64>("title_auto")? != 0,
+            participants: serde_json::from_str(&r.get::<_, String>("participants_json")?).unwrap_or_default(),
+            calendar_uid: r.get("calendar_uid")?,
         })
     }
 }
 
-const COLS: &str = "id, title, app, started_at, ended_at, duration_ms, has_video, status, folder_id, created_at";
+const COLS: &str = "id, title, app, started_at, ended_at, duration_ms, has_video, status, folder_id, created_at, error, title_auto, participants_json, calendar_uid";
 
 impl Store {
     pub fn create_meeting(&self, m: &Meeting) -> Result<()> {
         self.conn.lock().execute(
-            &format!("INSERT INTO meetings({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)"),
+            &format!("INSERT INTO meetings({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)"),
             params![m.id, m.title, m.app, m.started_at, m.ended_at, m.duration_ms, m.has_video as i64,
-                m.status.as_str(), m.folder_id, m.created_at],
+                m.status.as_str(), m.folder_id, m.created_at, m.error, m.title_auto as i64,
+                serde_json::to_string(&m.participants).unwrap_or_else(|_| "[]".into()), m.calendar_uid],
         )?;
         Ok(())
     }
@@ -94,11 +118,44 @@ impl Store {
     pub fn update_meeting(&self, m: &Meeting) -> Result<()> {
         self.conn.lock().execute(
             "UPDATE meetings SET title=?2, app=?3, started_at=?4, ended_at=?5, duration_ms=?6, has_video=?7,
-             status=?8, folder_id=?9 WHERE id=?1",
+             status=?8, folder_id=?9, error=?10, title_auto=?11, participants_json=?12, calendar_uid=?13 WHERE id=?1",
             params![m.id, m.title, m.app, m.started_at, m.ended_at, m.duration_ms, m.has_video as i64,
-                m.status.as_str(), m.folder_id],
+                m.status.as_str(), m.folder_id, m.error, m.title_auto as i64,
+                serde_json::to_string(&m.participants).unwrap_or_else(|_| "[]".into()), m.calendar_uid],
         )?;
         Ok(())
+    }
+
+    pub fn set_meeting_error(&self, id: &str, error: Option<&str>) -> Result<()> {
+        self.conn.lock().execute("UPDATE meetings SET error=?2 WHERE id=?1", params![id, error])?;
+        Ok(())
+    }
+
+    /// Replace the attendee list (deduplicated, order kept).
+    pub fn set_participants(&self, id: &str, names: &[String]) -> Result<()> {
+        let mut out: Vec<String> = Vec::new();
+        for n in names {
+            let n = n.trim();
+            if !n.is_empty() && !out.iter().any(|o| o.eq_ignore_ascii_case(n)) {
+                out.push(n.to_string());
+            }
+        }
+        self.conn.lock().execute(
+            "UPDATE meetings SET participants_json=?2 WHERE id=?1",
+            params![id, serde_json::to_string(&out).unwrap_or_else(|_| "[]".into())],
+        )?;
+        Ok(())
+    }
+
+    /// Set the title. `by_user` pins it so auto-titling never overwrites it again;
+    /// an automatic title only lands while the meeting still has an auto title.
+    pub fn set_title(&self, id: &str, title: &str, by_user: bool) -> Result<bool> {
+        let n = if by_user {
+            self.conn.lock().execute("UPDATE meetings SET title=?2, title_auto=0 WHERE id=?1", params![id, title])?
+        } else {
+            self.conn.lock().execute("UPDATE meetings SET title=?2 WHERE id=?1 AND title_auto=1", params![id, title])?
+        };
+        Ok(n > 0)
     }
 
     pub fn get_meeting(&self, id: &str) -> Result<Option<Meeting>> {
@@ -128,6 +185,26 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn errors_participants_and_title_pinning() {
+        let s = Store::open_in_memory().unwrap();
+        let m = Meeting::new_recording("Zoom call", Some("zoom"));
+        s.create_meeting(&m).unwrap();
+        s.set_meeting_error(&m.id, Some("summary: boom")).unwrap();
+        s.set_participants(&m.id, &["Ann".into(), " ann ".into(), "Bob".into()]).unwrap();
+        assert!(s.set_title(&m.id, "Auto title", false).unwrap());
+        let g = s.get_meeting(&m.id).unwrap().unwrap();
+        assert_eq!(g.error.as_deref(), Some("summary: boom"));
+        assert_eq!(g.participants, vec!["Ann", "Bob"]);
+        assert_eq!(g.title, "Auto title");
+        assert!(g.title_auto);
+        assert!(s.set_title(&m.id, "Mine", true).unwrap());
+        assert!(!s.set_title(&m.id, "Auto again", false).unwrap());
+        let g = s.get_meeting(&m.id).unwrap().unwrap();
+        assert_eq!(g.title, "Mine");
+        assert!(!g.title_auto);
+    }
 
     #[test]
     fn create_list_get_delete_meeting() {

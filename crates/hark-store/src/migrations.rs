@@ -102,6 +102,17 @@ CREATE TABLE shares(
   kind TEXT NOT NULL, start_ms INTEGER, end_ms INTEGER, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
 );
 "#,
+    // v5: processing errors, auto-titles, attendees, calendar link, chunk embeddings
+    r#"
+ALTER TABLE meetings ADD COLUMN error TEXT;
+ALTER TABLE meetings ADD COLUMN title_auto INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE meetings ADD COLUMN participants_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE meetings ADD COLUMN calendar_uid TEXT;
+CREATE TABLE chunk_vectors(
+  chunk_id INTEGER PRIMARY KEY REFERENCES chunks(id) ON DELETE CASCADE,
+  dim INTEGER NOT NULL, vec BLOB NOT NULL
+);
+"#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {

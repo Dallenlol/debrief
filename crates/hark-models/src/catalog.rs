@@ -55,12 +55,16 @@ pub struct TierModels {
 struct CatalogFile {
     models: Vec<ModelSpec>,
     tiers: HashMap<Tier, TierModels>,
+    #[serde(default)]
+    common: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Catalog {
     models: Vec<ModelSpec>,
     tiers: HashMap<Tier, TierModels>,
+    /// Models every tier needs (diarization).
+    common: Vec<String>,
 }
 
 const BUILTIN: &str = include_str!("../catalog.json");
@@ -68,7 +72,7 @@ const BUILTIN: &str = include_str!("../catalog.json");
 impl Catalog {
     pub fn builtin() -> Catalog {
         let f: CatalogFile = serde_json::from_str(BUILTIN).expect("catalog.json is valid");
-        Catalog { models: f.models, tiers: f.tiers }
+        Catalog { models: f.models, tiers: f.tiers, common: f.common }
     }
 
     pub fn all(&self) -> &[ModelSpec] {
@@ -79,6 +83,10 @@ impl Catalog {
         self.models.iter().find(|m| m.id == id)
     }
 
+    pub fn common_ids(&self) -> &[String] {
+        &self.common
+    }
+
     pub fn tier_models(&self, tier: Tier) -> &TierModels {
         &self.tiers[&tier]
     }
@@ -86,7 +94,9 @@ impl Catalog {
     /// The models a tier needs, in download order (live ASR first so captions work soonest).
     pub fn for_tier(&self, tier: Tier) -> Vec<&ModelSpec> {
         let t = self.tier_models(tier);
-        let mut ids = vec![t.asr_live.as_str(), t.asr_quality.as_str(), t.llm.as_str()];
+        let mut ids = vec![t.asr_live.as_str(), t.asr_quality.as_str()];
+        ids.extend(self.common.iter().map(String::as_str));
+        ids.push(t.llm.as_str());
         ids.dedup();
         ids.into_iter().filter_map(|id| self.get(id)).collect()
     }
@@ -133,6 +143,7 @@ mod tests {
             assert!(m.len() >= 2, "{t:?}");
             assert!(m.iter().any(|s| s.kind == ModelKind::Asr));
             assert!(m.iter().any(|s| s.kind == ModelKind::Llm));
+            assert_eq!(m.iter().filter(|s| s.kind == ModelKind::Diarize).count(), 2);
         }
         let gpu: Vec<&str> = c.for_tier(Tier::Gpu).iter().map(|m| m.id.as_str()).collect();
         assert!(gpu.contains(&"whisper-large-v3-turbo"));

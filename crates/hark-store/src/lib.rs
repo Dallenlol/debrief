@@ -8,10 +8,12 @@ mod meetings;
 mod migrations;
 mod segments;
 mod settings;
+mod speakers;
 
 pub use db::{data_dir, Store};
 pub use meetings::{Meeting, MeetingStatus};
 pub use segments::{NewSegment, SearchHit, Segment};
+pub use speakers::{MeetingSpeaker, Speaker};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {

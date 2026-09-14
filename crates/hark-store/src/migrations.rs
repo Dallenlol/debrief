@@ -38,6 +38,25 @@ CREATE TRIGGER segments_au AFTER UPDATE ON segments BEGIN
 END;
 CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 "#,
+    // v2: speakers
+    r#"
+CREATE TABLE speakers(
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  embedding BLOB NOT NULL,
+  dim INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX speakers_name ON speakers(name COLLATE NOCASE);
+CREATE TABLE meeting_speakers(
+  meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  speaker_id TEXT,
+  suggested_id TEXT,
+  suggested_score REAL,
+  PRIMARY KEY(meeting_id, label)
+);
+"#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {

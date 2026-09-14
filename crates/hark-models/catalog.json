@@ -69,11 +69,47 @@
       "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
       "size_bytes": 5027783488,
       "note": "Best quality; needs a GPU with 6 GB+ VRAM."
+    },
+    {
+      "id": "pyannote-seg-3",
+      "kind": "diarize",
+      "name": "Speaker segmentation (pyannote 3.0)",
+      "file": "pyannote-segmentation-3-0.onnx",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx",
+      "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+      "size_bytes": 5992913,
+      "note": "Finds who spoke when."
+    },
+    {
+      "id": "titanet-small",
+      "kind": "diarize",
+      "name": "Speaker voiceprints (NeMo TitaNet small)",
+      "file": "nemo_en_titanet_small.onnx",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_small.onnx",
+      "sha256": "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e",
+      "size_bytes": 40257283,
+      "note": "Tells speakers apart and remembers voices you have named."
     }
   ],
   "tiers": {
-    "cpu_low":  { "asr_live": "whisper-base",  "asr_quality": "whisper-small",           "llm": "qwen3-1.7b-q4" },
-    "cpu_high": { "asr_live": "whisper-small", "asr_quality": "whisper-medium",          "llm": "qwen3-4b-q4" },
-    "gpu":      { "asr_live": "whisper-small", "asr_quality": "whisper-large-v3-turbo",  "llm": "qwen3-8b-q4" }
-  }
+    "cpu_low": {
+      "asr_live": "whisper-base",
+      "asr_quality": "whisper-small",
+      "llm": "qwen3-1.7b-q4"
+    },
+    "cpu_high": {
+      "asr_live": "whisper-small",
+      "asr_quality": "whisper-medium",
+      "llm": "qwen3-4b-q4"
+    },
+    "gpu": {
+      "asr_live": "whisper-small",
+      "asr_quality": "whisper-large-v3-turbo",
+      "llm": "qwen3-8b-q4"
+    }
+  },
+  "common": [
+    "pyannote-seg-3",
+    "titanet-small"
+  ]
 }

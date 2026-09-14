@@ -42,6 +42,10 @@ jobs:
           pnpm typecheck
           pnpm test
           pnpm build
+      - name: Build tests
+        run: cargo test --workspace --exclude hark --no-run
+      - name: Stage runtime libraries next to the test binaries
+        run: node scripts/stage-runtime-libs.mjs --profile debug
       - name: Rust tests
         run: cargo test --workspace --exclude hark
       - name: Clippy

@@ -79,10 +79,30 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/ffmpeg"
+      "binaries/ffmpeg",
+      "binaries/hark-diarize"
     ],
     "category": "Productivity",
     "shortDescription": "Local-only meeting recorder with private AI",
-    "longDescription": "Hark records your meetings locally, transcribes them with speaker labels and lets you chat with a private, on-device AI about them. Nothing leaves your computer."
+    "longDescription": "Hark records your meetings locally, transcribes them with speaker labels and lets you chat with a private, on-device AI about them. Nothing leaves your computer.",
+    "resources": {
+      "resources/*": "./"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "entitlements": "entitlements.plist"
+    },
+    "publisher": "Hark contributors",
+    "homepage": "https://dallenlol.github.io/hark",
+    "copyright": "MIT License"
   }
 }

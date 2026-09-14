@@ -5,7 +5,7 @@ members = ["crates/*", "src-tauri"]
 [workspace.package]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/hark-app/hark"
+repository = "https://github.com/Dallenlol/hark"
 
 [workspace.dependencies]
 anyhow = "1"

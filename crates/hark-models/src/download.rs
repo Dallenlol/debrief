@@ -64,7 +64,7 @@ pub async fn download(
         done = 0;
     }
 
-    let client = reqwest::Client::builder().user_agent("hark/0.1 (+https://github.com/hark-app/hark)").build()?;
+    let client = reqwest::Client::builder().user_agent("hark/0.1 (+https://github.com/Dallenlol/hark)").build()?;
     let mut req = client.get(&spec.url);
     if done > 0 {
         req = req.header(reqwest::header::RANGE, format!("bytes={done}-"));

@@ -1,0 +1,18 @@
+name: Bug report
+description: Something is broken
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes: { label: Hark version and OS, placeholder: "0.1.0, Windows 11 / macOS 15" }
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: Steps, what you expected, what you got. }
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes: { label: Log excerpt, description: "Windows: %LOCALAPPDATA%\app.hark.desktop\logs. macOS: ~/Library/Logs/app.hark.desktop. Paste the relevant lines.", render: text }
+  - type: input
+    id: hw
+    attributes: { label: Hardware, placeholder: "CPU, RAM, GPU (if any)" }

@@ -6,17 +6,24 @@ Hark notices when you're in a call, offers a **Record** button (it never records
 
 > Think of it as an open-source, offline alternative to Fathom, Otter and Fireflies.
 
+## What it does
+
+- **Notices calls** in Zoom, Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime, GoToMeeting (and anything else, via audio activity) and shows a small **Record?** popup. A global hotkey and tray menu work anytime.
+- **Records** your mic and system audio as separate tracks, plus optional screen video. Writes to disk continuously, so a crash loses seconds, not the meeting.
+- **Transcribes** with live captions during the call and a full pass after, with **speaker labels**. Name a speaker once; Hark recognises their voice next time and asks you to confirm.
+- **Cleans up** messy transcripts with a local language model: bad mics, broken English, filler. The raw transcript is always kept.
+- **Summarises** instantly from editable templates (general, sales call, client discovery, 1:1, standup, interview).
+- **Answers questions** ("Ask Hark") about one meeting or your whole library, citing timestamps you can click.
+- **Organises** with folders, tags, search, highlights and clips.
+- **Shares** via links on your network, `.hark` bundles you can import on another computer, or a standalone web page.
+
+## Install
+
+Grab an installer from [Releases](https://github.com/Dallenlol/hark/releases): Windows (CPU or CUDA) and macOS (Apple Silicon or Intel). See [docs/install.md](docs/install.md).
+
 ## Status
 
-Early development. Current milestone: **M1 - recording, detection and live captions**.
-
-| Milestone | What it adds | Status |
-|---|---|---|
-| M1 | Call detection popup, hotkey, mic + system audio, optional screen video, live captions, library and player | In progress |
-| M2 | Speaker identification, naming speakers, AI cleanup of messy transcripts | Planned |
-| M3 | Instant summaries, custom templates, "Ask Hark" chat over meetings | Planned |
-| M4 | Folders, tags, search, clips, LAN share links, export/import | Planned |
-| M5 | Signed installers (Windows / macOS), website | Planned |
+**0.1.0** - first public build. Everything above works; polish and more meeting-app patterns are ongoing. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Principles
 
@@ -31,11 +38,11 @@ Requirements: [Rust](https://rustup.rs) (stable), [Node 22+](https://nodejs.org)
 
 ```bash
 pnpm install
-# put an ffmpeg binary at src-tauri/binaries/ffmpeg-<target-triple>[.exe]
-#   e.g. src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
-#        src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+node scripts/prepare-bundle.mjs --profile dev   # downloads ffmpeg, builds the diarization sidecar, collects runtime libs
 pnpm tauri dev
 ```
+
+Installers: `node scripts/prepare-bundle.mjs && pnpm tauri build` (add `--features cuda` on Windows with the CUDA toolkit, or `--features metal` on macOS).
 
 Tests:
 
@@ -44,8 +51,6 @@ cargo test --workspace
 pnpm test
 ```
 
-GPU builds: `pnpm tauri build --features cuda` (Windows, needs CUDA toolkit) or `--features metal` (macOS).
-
 ## Data location
 
 - Windows: `%APPDATA%\Hark`
@@ -53,9 +58,13 @@ GPU builds: `pnpm tauri build --features cuda` (Windows, needs CUDA toolkit) or 
 
 Inside: `hark.db` (SQLite), `models/`, and `recordings/<meeting-id>/` with `mic.wav`, `sys.wav`, `mix.wav` and `screen.mp4`.
 
+## Docs
+
+[Install](docs/install.md) - [Models and hardware](docs/models.md) - [Privacy](docs/privacy.md) - [FAQ](docs/faq.md) - [Architecture](docs/dev/architecture.md)
+
 ## Contributing
 
-See [docs/dev/architecture.md](docs/dev/architecture.md) for the crate map. Issues and PRs welcome; please keep the "manual by design" and "local only" principles.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome; please keep the "manual by design" and "local only" principles.
 
 ## License
 

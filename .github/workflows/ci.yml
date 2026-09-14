@@ -28,6 +28,10 @@ jobs:
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-directories: |
+            ~/.cache/sherpa-rs
+            ~/AppData/Local/sherpa-rs
       - name: Install LLVM (bindgen)
         if: runner.os == 'Windows'
         run: choco install -y llvm
@@ -42,4 +46,11 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --exclude hark --all-targets -- -D warnings
       - name: App compiles
-        run: cargo check -p hark
+        shell: bash
+        run: |
+          # tauri-build needs the sidecar files to exist; empty placeholders are enough for a type-check.
+          triple=$(rustc -vV | sed -n 's/host: //p')
+          ext=""; [[ "$RUNNER_OS" == "Windows" ]] && ext=".exe"
+          mkdir -p src-tauri/binaries
+          touch "src-tauri/binaries/ffmpeg-${triple}${ext}" "src-tauri/binaries/hark-diarize-${triple}${ext}"
+          cargo check -p hark

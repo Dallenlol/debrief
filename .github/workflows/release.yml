@@ -45,6 +45,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.name }}
+          # sherpa-rs downloads prebuilt binaries here; cache them with the build-script output that references them.
+          cache-directories: |
+            ~/.cache/sherpa-rs
+            ~/AppData/Local/sherpa-rs
+            ~/.cache/hark
       - name: Install LLVM (bindgen)
         if: runner.os == 'Windows'
         run: choco install -y llvm
@@ -61,14 +66,11 @@ jobs:
         run: node scripts/prepare-bundle.mjs --features "${{ matrix.features }}"
       - name: Build installers
         uses: tauri-apps/tauri-action@v0
+        # To sign and notarize macOS builds, add APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+        # APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID as repository secrets
+        # and pass them through here (tauri-action treats an empty value as a broken certificate).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Hark ${{ github.ref_name }}"

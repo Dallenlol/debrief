@@ -1,0 +1,17 @@
+[package]
+name = "hark-capture"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cpal = "0.18"
+hound = "3.5"
+crossbeam-channel.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

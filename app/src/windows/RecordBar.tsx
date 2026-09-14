@@ -19,7 +19,15 @@ export function RecordBar() {
       if (s.state === "idle") setCaptions([]);
     });
     const b = subscribe("levels", setLevels);
-    const c = subscribe("caption", (cap) => setCaptions((xs) => [...xs.slice(-1), cap]));
+    // A non-final caption replaces the previous non-final one (same window), so the
+    // line refines in place instead of flickering; a final caption becomes history.
+    const c = subscribe("caption", (cap) =>
+      setCaptions((xs) => {
+        const last = xs[xs.length - 1];
+        const base = last && !last.is_final ? xs.slice(0, -1) : xs;
+        return [...base.slice(-1), cap];
+      }),
+    );
     const t = setInterval(() => void cmd.recordingStatus().then(setRec), 1000);
     return () => {
       a();
@@ -52,7 +60,7 @@ export function RecordBar() {
           <span className="text-ink-3">{paused ? "Paused" : "Listening..."}</span>
         ) : (
           captions.map((c, i) => (
-            <div key={`${c.start_ms}-${i}`} className={cn("truncate", i === captions.length - 1 ? "text-ink" : "text-ink-3")}>
+            <div key={`${c.start_ms}-${i}`} aria-live={i === captions.length - 1 ? "polite" : undefined} className={cn("truncate", i === captions.length - 1 ? "text-ink" : "text-ink-3")}>
               {c.text}
             </div>
           ))

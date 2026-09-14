@@ -166,11 +166,11 @@ export function ChatPanel({ scopeKind, scopeId = null, onSeek, placeholder, clas
           className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent py-1 text-[14px] outline-none placeholder:text-ink-3"
         />
         {streaming ? (
-          <Button variant="soft" size="icon" type="button" onClick={() => chatId && void cmd.cancelChat(chatId)} title="Stop">
+          <Button variant="soft" size="icon" type="button" onClick={() => chatId && void cmd.cancelChat(chatId)} title="Stop" aria-label="Stop generating">
             <Square size={14} fill="currentColor" />
           </Button>
         ) : (
-          <Button variant="primary" size="icon" type="submit" disabled={!draft.trim()} title="Send">
+          <Button variant="primary" size="icon" type="submit" disabled={!draft.trim()} title="Send" aria-label="Send message">
             <ArrowUp size={16} />
           </Button>
         )}

@@ -102,7 +102,24 @@ export const Player = forwardRef<PlayerHandle, PlayerProps>(function Player({ au
         </>
       )}
 
-      <div className="group relative h-2 cursor-pointer rounded-full bg-line" onClick={scrub}>
+      <div
+        role="slider"
+        aria-label="Playback position"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(time)}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowLeft") skip(-5);
+          else if (e.key === "ArrowRight") skip(5);
+          else if (e.key === " ") {
+            e.preventDefault();
+            toggle();
+          }
+        }}
+        className="focus-ring group relative h-2 cursor-pointer rounded-full bg-line"
+        onClick={scrub}
+      >
         <div className="absolute inset-y-0 left-0 rounded-full bg-ink" style={{ width: `${pct}%` }} />
         {highlights.map((h) => (
           <span
@@ -115,13 +132,13 @@ export const Player = forwardRef<PlayerHandle, PlayerProps>(function Player({ au
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="iconSm" onClick={() => skip(-10)} title="Back 10 s">
+        <Button variant="ghost" size="iconSm" onClick={() => skip(-10)} title="Back 10 s" aria-label="Back 10 seconds">
           <RotateCcw size={16} />
         </Button>
-        <Button variant="primary" size="icon" onClick={toggle} title={playing ? "Pause" : "Play"}>
+        <Button variant="primary" size="icon" onClick={toggle} title={playing ? "Pause" : "Play"} aria-label={playing ? "Pause" : "Play"}>
           {playing ? <Pause size={16} /> : <Play size={16} className="translate-x-px" />}
         </Button>
-        <Button variant="ghost" size="iconSm" onClick={() => skip(10)} title="Forward 10 s">
+        <Button variant="ghost" size="iconSm" onClick={() => skip(10)} title="Forward 10 s" aria-label="Forward 10 seconds">
           <RotateCw size={16} />
         </Button>
         <span className="ml-2 font-mono text-[12px] tabular-nums text-ink-2">

@@ -35,6 +35,18 @@ export function Popup() {
     if (det && left <= 0) void cmd.dismissDetection(det.app, "now");
   }, [left, det]);
 
+  // Escape = "Not now"; Enter = Record.
+  useEffect(() => {
+    if (!det) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") void cmd.dismissDetection(det.app, "now");
+      else if (e.key === "Enter" && !(e.target instanceof HTMLSelectElement)) void record();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [det, video, target]);
+
   const record = async () => {
     if (!det) return;
     await cmd.startRecording({ app: det.app === "unknown" ? undefined : det.app, video, target: video && target ? target : undefined });
@@ -43,7 +55,7 @@ export function Popup() {
   if (!det) return <div className="h-full" />;
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-line bg-canvas p-4 shadow-float" data-tauri-drag-region>
+    <div role="dialog" aria-label={`${det.label} detected. Record?`} className="flex h-full flex-col rounded-xl border border-line bg-canvas p-4 shadow-float" data-tauri-drag-region>
       <div className="flex items-start justify-between gap-3" data-tauri-drag-region>
         <div className="min-w-0" data-tauri-drag-region>
           <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
@@ -54,6 +66,8 @@ export function Popup() {
           <div className="mt-0.5 truncate text-[12px] text-ink-3" title={det.title}>{det.title}</div>
         </div>
         <button
+          aria-pressed={video}
+          aria-label="Record screen video"
           onClick={() => setVideo((v) => !v)}
           className={`focus-ring inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium ${video ? "bg-ink text-canvas" : "bg-canvas-3 text-ink-2"}`}
           title="Toggle screen video"

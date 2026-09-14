@@ -156,7 +156,7 @@ export function MeetingPage() {
           ) : (
             <h1 className="group flex items-center gap-2 font-serif text-[32px] leading-tight tracking-tight">
               <span className="truncate">{m.title}</span>
-              <button className="text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-ink" onClick={() => setEditing(true)} title="Rename">
+              <button className="focus-ring rounded text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-ink" onClick={() => setEditing(true)} title="Rename" aria-label="Rename meeting">
                 <Pencil size={16} />
               </button>
             </h1>
@@ -182,7 +182,7 @@ export function MeetingPage() {
             {tags.map((t) => (
               <span key={t.id} className="inline-flex items-center gap-1 rounded-full bg-canvas-3 px-2 py-0.5 text-[12px] text-ink-2">
                 {t.name}
-                <button onClick={() => void cmd.untagMeeting(m.id, t.id).then(() => cmd.meetingTags(m.id)).then(setTags)} className="text-ink-3 hover:text-ember"><X size={11} /></button>
+                <button onClick={() => void cmd.untagMeeting(m.id, t.id).then(() => cmd.meetingTags(m.id)).then(setTags)} aria-label={`Remove tag ${t.name}`} className="focus-ring rounded text-ink-3 hover:text-ember"><X size={11} /></button>
               </span>
             ))}
             <form

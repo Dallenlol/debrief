@@ -43,10 +43,10 @@ export function SpeakerChip({ label, colorClass, suggestion, onRename, onAcceptS
           list={nameOptions.length ? listId : undefined}
           className="focus-ring h-6 w-40 rounded border border-line-2 bg-canvas px-2 text-[12px] font-semibold"
         />
-        <button type="submit" className="text-moss" title="Save">
+        <button type="submit" className="focus-ring rounded text-moss" title="Save" aria-label="Save name">
           <Check size={14} />
         </button>
-        <button type="button" onClick={() => setEditing(false)} className="text-ink-3" title="Cancel">
+        <button type="button" onClick={() => setEditing(false)} className="focus-ring rounded text-ink-3" title="Cancel" aria-label="Cancel">
           <X size={14} />
         </button>
         {nameOptions.length > 0 && (

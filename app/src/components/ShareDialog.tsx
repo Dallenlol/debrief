@@ -75,7 +75,7 @@ export function ShareDialog({ meetingId, title, durationMs, hasVideo, currentMs,
             <h2 className="font-serif text-[22px] leading-tight">Share or export</h2>
             <p className="text-[12px] text-ink-3">Links only work on your network while Hark is open. Files work anywhere.</p>
           </div>
-          <button onClick={onClose} className="text-ink-3 hover:text-ink"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="focus-ring rounded text-ink-3 hover:text-ink"><X size={18} /></button>
         </div>
 
         <section className="mb-5">

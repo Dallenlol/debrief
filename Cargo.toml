@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "src-tauri"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/hark-app/hark"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true

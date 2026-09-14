@@ -61,6 +61,7 @@ fn run(app: AppHandle) {
                     label: "Possible call".into(),
                     title: "Microphone and speakers are both active".into(),
                     confidence: 0.5,
+                    hwnd: 0,
                 });
             }
         } else if det.is_some() {

@@ -156,12 +156,56 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
         highlights: Vec::new(),
     });
     state.detection_paused.store(true, Ordering::SeqCst);
+    spawn_participant_sampler(app.clone(), meeting.id.clone(), opts.app.clone());
     log::info!("recorder: showing record bar");
     windows::hide_popup(app);
     windows::show_recordbar(app);
     emit_state(app);
     log::info!("recorder: started {}", meeting.id);
     Ok(meeting)
+}
+
+/// While this meeting records, read attendee names from the meeting window's
+/// accessibility tree every 45 s and merge them into the meeting.
+fn spawn_participant_sampler(app: AppHandle, meeting_id: String, app_id: Option<String>) {
+    let Some(app_id) = app_id.filter(|a| a != "unknown") else { return };
+    std::thread::spawn(move || {
+        let patterns = hark_detect::PatternSet::builtin();
+        let mut first = true;
+        loop {
+            if !first {
+                std::thread::sleep(std::time::Duration::from_secs(45));
+            }
+            first = false;
+            let state = app.state::<AppState>();
+            let still = state.recording.lock().as_ref().map(|a| a.meeting.id == meeting_id).unwrap_or(false);
+            if !still {
+                break;
+            }
+            let windows = hark_detect::list_visible_windows();
+            let Some(det) = patterns.match_windows(&windows).filter(|d| d.app == app_id && d.hwnd != 0) else { continue };
+            let raw = hark_detect::scrape_window(det.hwnd);
+            let names = hark_detect::extract_names(&app_id, &raw);
+            if names.is_empty() {
+                continue;
+            }
+            let mut merged = state.recording.lock().as_ref().map(|a| a.meeting.participants.clone()).unwrap_or_default();
+            let before = merged.len();
+            for n in names {
+                if !merged.iter().any(|m| m.eq_ignore_ascii_case(&n)) {
+                    merged.push(n);
+                }
+            }
+            if merged.len() == before {
+                continue;
+            }
+            if let Some(a) = state.recording.lock().as_mut() {
+                a.meeting.participants = merged.clone();
+            }
+            let _ = state.store.set_participants(&meeting_id, &merged);
+            let _ = app.emit(events::PARTICIPANTS, events::ParticipantsPayload { meeting_id: meeting_id.clone(), participants: merged });
+        }
+    });
 }
 
 pub fn pause(app: &AppHandle) {

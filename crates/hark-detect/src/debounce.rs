@@ -50,7 +50,7 @@ mod tests {
     use super::*;
 
     fn det(app: &str) -> Detected {
-        Detected { app: app.into(), label: app.into(), title: "t".into(), confidence: 1.0 }
+        Detected { app: app.into(), label: app.into(), title: "t".into(), confidence: 1.0, hwnd: 0 }
     }
 
     #[test]

@@ -51,7 +51,7 @@ mod imp {
         let mut pid = 0u32;
         GetWindowThreadProcessId(hwnd, Some(&mut pid));
         let process = process_name(pid).unwrap_or_default();
-        out.push(WindowInfo { process, title });
+        out.push(WindowInfo { process, title, hwnd: hwnd.0 as isize });
         BOOL(1)
     }
 
@@ -103,7 +103,7 @@ mod imp {
                 continue;
             }
             let owner = get_str(&dict, "kCGWindowOwnerName").unwrap_or_default().to_lowercase();
-            out.push(WindowInfo { process: owner, title });
+            out.push(WindowInfo { process: owner, title, hwnd: 0 });
         }
         out
     }

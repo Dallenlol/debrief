@@ -5,11 +5,13 @@
 
 mod audio_activity;
 mod debounce;
+mod participants;
 mod patterns;
 mod windows_enum;
 
 pub use audio_activity::AudioActivity;
 pub use debounce::Debouncer;
+pub use participants::{extract_names, scrape_window};
 pub use patterns::{Detected, Pattern, PatternError, PatternSet, WindowInfo};
 pub use windows_enum::list_visible_windows;
 

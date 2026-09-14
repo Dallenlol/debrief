@@ -29,7 +29,7 @@ pub fn run_summary(app: &AppHandle, meeting_id: &str, template_id: Option<&str>)
     };
     let Ok(Some(meeting)) = state.store.get_meeting(meeting_id) else { return };
     let segs = state.store.segments(meeting_id).unwrap_or_default();
-    let mut participants: Vec<String> = Vec::new();
+    let mut participants: Vec<String> = meeting.participants.clone();
     for s in &segs {
         if let Some(sp) = &s.speaker {
             if !participants.contains(sp) {

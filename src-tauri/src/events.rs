@@ -11,6 +11,13 @@ pub const PROCESSING: &str = "processing";
 pub const NOTICE: &str = "notice";
 pub const CHAT_TOKEN: &str = "chat_token";
 pub const CHAT_DONE: &str = "chat_done";
+pub const PARTICIPANTS: &str = "participants";
+
+#[derive(Serialize, Clone)]
+pub struct ParticipantsPayload {
+    pub meeting_id: String,
+    pub participants: Vec<String>,
+}
 
 #[derive(Serialize, Clone)]
 pub struct DetectionPayload {

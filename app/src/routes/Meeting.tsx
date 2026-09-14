@@ -42,6 +42,7 @@ export function MeetingPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [asrModels, setAsrModels] = useState<ModelRow[]>([]);
+  const [knownSpeakers, setKnownSpeakers] = useState<string[]>([]);
   const player = useRef<PlayerHandle>(null);
 
   const load = useCallback(() => {
@@ -61,7 +62,12 @@ export function MeetingPage() {
   useEffect(() => {
     void cmd.listTemplates().then(setTemplates);
     void cmd.listModels().then((ms) => setAsrModels(ms.filter((m) => m.spec.kind === "asr" && m.present)));
+    void cmd.listKnownSpeakers().then((ks) => setKnownSpeakers(ks.map((k) => k.name)));
   }, []);
+
+  useEffect(() => subscribe("participants", (p) => {
+    if (p.meeting_id === id) setDetail((d) => (d ? { ...d, meeting: { ...d.meeting, participants: p.participants } } : d));
+  }), [id]);
 
   useEffect(() => {
     load();
@@ -99,6 +105,7 @@ export function MeetingPage() {
   const hasClean = detail.segments.some((s) => s.clean_text);
   const useClean = (view ?? "clean") === "clean" && hasClean;
   const speakers = detail.speakers.filter((sp) => !dismissed.includes(sp.label));
+  const nameOptions = Array.from(new Set([...m.participants, ...knownSpeakers])).filter((n) => n.toLowerCase() !== "me");
 
   const renameSpeaker = async (label: string, name: string) => {
     await cmd.renameSpeaker(m.id, label, name);
@@ -298,6 +305,7 @@ export function MeetingPage() {
                 onSeek={(ms) => player.current?.seek(ms)}
                 useClean={useClean}
                 speakers={speakers}
+                nameOptions={nameOptions}
                 onRenameSpeaker={renameSpeaker}
                 onAcceptSuggestion={acceptSuggestion}
                 onDismissSuggestion={(label) => setDismissed((d) => [...d, label])}

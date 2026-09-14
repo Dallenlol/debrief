@@ -7,6 +7,9 @@ pub struct WindowInfo {
     /// Lower-cased executable base name (Windows) or app owner name (macOS).
     pub process: String,
     pub title: String,
+    /// Native window handle (Windows HWND); 0 when unknown.
+    #[serde(default)]
+    pub hwnd: isize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +31,9 @@ pub struct Detected {
     pub title: String,
     /// 1.0 for an app/window match, 0.5 for the audio-activity fallback.
     pub confidence: f32,
+    /// Native handle of the matched window (Windows), 0 otherwise.
+    #[serde(default)]
+    pub hwnd: isize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,6 +111,7 @@ impl PatternSet {
                         label: c.pattern.label.clone(),
                         title: w.title.clone(),
                         confidence: 1.0,
+                        hwnd: w.hwnd,
                     });
                 }
             }
@@ -139,7 +146,7 @@ mod tests {
     use super::*;
 
     fn w(p: &str, t: &str) -> WindowInfo {
-        WindowInfo { process: p.into(), title: t.into() }
+        WindowInfo { process: p.into(), title: t.into(), hwnd: 0 }
     }
 
     #[test]

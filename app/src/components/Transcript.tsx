@@ -12,6 +12,8 @@ export interface TranscriptProps {
   autoScroll?: boolean;
   className?: string;
   speakers?: MeetingSpeaker[];
+  /** Names offered in the rename box (attendees + known speakers). */
+  nameOptions?: string[];
   onRenameSpeaker?: (label: string, name: string) => void | Promise<void>;
   onAcceptSuggestion?: (label: string) => void | Promise<void>;
   onDismissSuggestion?: (label: string) => void;
@@ -27,6 +29,7 @@ export function Transcript({
   autoScroll = true,
   className,
   speakers = [],
+  nameOptions = [],
   onRenameSpeaker,
   onAcceptSuggestion,
   onDismissSuggestion,
@@ -89,6 +92,7 @@ export function Transcript({
                   onRename={(name) => onRenameSpeaker(s.speaker!, name)}
                   onAcceptSuggestion={() => onAcceptSuggestion?.(s.speaker!)}
                   onDismissSuggestion={() => onDismissSuggestion?.(s.speaker!)}
+                  nameOptions={nameOptions}
                 />
               ) : (
                 <div className={cn("mb-0.5 text-[12px] font-semibold", color)}>{s.speaker}</div>

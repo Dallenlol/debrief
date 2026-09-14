@@ -10,6 +10,11 @@ const listen: typeof tauriListen = isMock ? (async () => () => {}) as typeof tau
 
 export type MeetingStatus = "recording" | "processing" | "ready" | "failed";
 
+export interface ParticipantsPayload {
+  meeting_id: string;
+  participants: string[];
+}
+
 export interface Meeting {
   id: string;
   title: string;
@@ -319,6 +324,7 @@ export interface Events {
   notice: { level: "info" | "warning" | "error"; message: string };
   chat_token: { chat_id: string; message_id: string; delta: string };
   chat_done: { chat_id: string; message: ChatMessage; error: string | null };
+  participants: ParticipantsPayload;
 }
 
 export function on<K extends keyof Events>(name: K, handler: (payload: Events[K]) => void): Promise<UnlistenFn> {

@@ -1,5 +1,5 @@
 import { Check, Pencil, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/cn";
 
 export interface SpeakerChipProps {
@@ -9,12 +9,15 @@ export interface SpeakerChipProps {
   onRename: (name: string) => void | Promise<void>;
   onAcceptSuggestion?: () => void | Promise<void>;
   onDismissSuggestion?: () => void;
+  /** Names to offer while typing: attendees seen in the meeting and known speakers. */
+  nameOptions?: string[];
 }
 
 /** Speaker label in the transcript: click to rename; shows a confirmable "Is this X?" chip. */
-export function SpeakerChip({ label, colorClass, suggestion, onRename, onAcceptSuggestion, onDismissSuggestion }: SpeakerChipProps) {
+export function SpeakerChip({ label, colorClass, suggestion, onRename, onAcceptSuggestion, onDismissSuggestion, nameOptions = [] }: SpeakerChipProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label);
+  const listId = useId();
 
   const commit = async () => {
     const name = draft.trim();
@@ -37,6 +40,7 @@ export function SpeakerChip({ label, colorClass, suggestion, onRename, onAcceptS
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
+          list={nameOptions.length ? listId : undefined}
           className="focus-ring h-6 w-40 rounded border border-line-2 bg-canvas px-2 text-[12px] font-semibold"
         />
         <button type="submit" className="text-moss" title="Save">
@@ -45,6 +49,11 @@ export function SpeakerChip({ label, colorClass, suggestion, onRename, onAcceptS
         <button type="button" onClick={() => setEditing(false)} className="text-ink-3" title="Cancel">
           <X size={14} />
         </button>
+        {nameOptions.length > 0 && (
+          <datalist id={listId}>
+            {nameOptions.map((n) => <option key={n} value={n} />)}
+          </datalist>
+        )}
       </form>
     );
   }

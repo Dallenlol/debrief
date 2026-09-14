@@ -10,14 +10,16 @@ Hark notices when you're in a call, offers a **Record** button (it never records
 
 ## What it does
 
-- **Notices calls** in Zoom, Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime, GoToMeeting (and anything else, via audio activity) and shows a small **Record?** popup. A global hotkey and tray menu work anytime.
+- **Notices calls** in Zoom, Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime, GoToMeeting, Whereby, Jitsi, Around, Skype, RingCentral, WhatsApp/Telegram/Signal calls - native or in a browser tab - and anything else via audio activity. Shows a small **Record?** popup with a screen picker; a global hotkey and tray menu work anytime.
 - **Records** your mic and system audio as separate tracks, plus optional screen video. Writes to disk continuously, so a crash loses seconds, not the meeting.
-- **Transcribes** with live captions during the call and a full pass after, with **speaker labels**. Name a speaker once; Hark recognises their voice next time and asks you to confirm.
+- **Transcribes** with live captions during the call and a full pass after, with **speaker labels**, in English or 30 other languages. Name a speaker once; Hark recognises their voice next time and asks you to confirm. Attendee names from the meeting window or your calendar are offered as you type.
 - **Cleans up** messy transcripts with a local language model: bad mics, broken English, filler. The raw transcript is always kept.
-- **Summarises** instantly from editable templates (general, sales call, client discovery, 1:1, standup, interview).
-- **Answers questions** ("Ask Hark") about one meeting or your whole library, citing timestamps you can click.
+- **Summarises** instantly from editable templates (general, sales call, client discovery, 1:1, standup, interview), condensing long meetings part by part so nothing is dropped. Titles itself from the content.
+- **Answers questions** ("Ask Hark") about one meeting or your whole library with hybrid keyword + semantic search, citing timestamps you can click.
 - **Organises** with folders, tags, search, highlights and clips.
-- **Shares** via links on your network, `.hark` bundles you can import on another computer, or a standalone web page.
+- **Shares** via links on your network, `.hark` bundles you can import on another computer, or a standalone web page. An opt-in webhook pushes finished meetings to Zapier, n8n, Make or your own script.
+- **Knows your calendar** from private .ics links (Google, Outlook): recordings take the event's name and attendees.
+- **Updates itself** from signed GitHub releases, with your click.
 
 ![Library with folders and tags](docs/img/library.png)
 
@@ -27,7 +29,7 @@ Grab an installer from [Releases](https://github.com/Dallenlol/hark/releases): W
 
 ## Status
 
-**0.1.0** - first public build. Everything above works; polish and more meeting-app patterns are ongoing. See [CHANGELOG.md](CHANGELOG.md).
+**0.2.0** - second public build. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Principles
 

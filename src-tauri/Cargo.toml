@@ -1,6 +1,6 @@
 [package]
 name = "hark"
-version = "0.1.0"
+version = "0.2.0"
 description = "Hark - local-only, open-source meeting recorder with private AI"
 edition.workspace = true
 license.workspace = true

@@ -8,7 +8,9 @@ Everything runs on your machine. Hark chooses model sizes from what it finds:
 | CPU, roomy | 12 GB+ RAM, no GPU | Whisper small | Whisper medium | Qwen3 4B |
 | GPU | NVIDIA 6 GB+ VRAM or Apple Silicon | Whisper small | Whisper large-v3-turbo | Qwen3 8B |
 
-Speaker identification always uses pyannote segmentation 3.0 (6 MB) and NeMo TitaNet small (40 MB).
+Speaker identification always uses pyannote segmentation 3.0 (6 MB) and NeMo TitaNet small (40 MB). Semantic search in Ask Hark uses BGE small v1.5 (37 MB); without it, search is keyword-only.
+
+On first run Hark suggests downloading the *essentials* (live-caption model, speaker models, search model) and finishing the larger transcript and language models in the background. Meetings recorded in the meantime get their clean-up and summary automatically once the language model lands.
 
 Override any of this in Settings > AI models. Bigger models are better but slower; on CPU the 8B model can take a minute or two to summarise a long meeting.
 

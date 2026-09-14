@@ -85,6 +85,23 @@ CREATE VIRTUAL TABLE chunks_fts USING fts5(text, content='chunks', content_rowid
 CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN INSERT INTO chunks_fts(rowid, text) VALUES (new.id, new.text); END;
 CREATE TRIGGER chunks_ad AFTER DELETE ON chunks BEGIN INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES ('delete', old.id, old.text); END;
 "#,
+    // v4: folders, tags, shares
+    r#"
+CREATE TABLE folders(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT, default_template_id TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE tags(id TEXT PRIMARY KEY, name TEXT NOT NULL);
+CREATE UNIQUE INDEX tags_name ON tags(name COLLATE NOCASE);
+CREATE TABLE meeting_tags(
+  meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY(meeting_id, tag_id)
+);
+CREATE TABLE shares(
+  token TEXT PRIMARY KEY, meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL, start_ms INTEGER, end_ms INTEGER, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+);
+"#,
 ];
 
 pub fn run(conn: &Connection) -> rusqlite::Result<()> {

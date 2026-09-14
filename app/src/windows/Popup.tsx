@@ -42,6 +42,7 @@ export function Popup() {
             <span className="h-2 w-2 rounded-full bg-moss" />
             {det.label} detected
           </div>
+          {det.event && <div className="mt-0.5 truncate text-[12px] font-medium text-ink-2" title="From your calendar">{det.event}</div>}
           <div className="mt-0.5 truncate text-[12px] text-ink-3" title={det.title}>{det.title}</div>
         </div>
         <button

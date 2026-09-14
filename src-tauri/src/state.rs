@@ -41,6 +41,9 @@ pub struct AppState {
     pub chat_cancels: Mutex<HashMap<String, Arc<AtomicBool>>>,
     /// LAN share server, running only while at least one share is enabled.
     pub share_server: Mutex<Option<hark_share::ShareServerHandle>>,
+    /// Cached calendar events from the configured .ics sources.
+    pub calendar: RwLock<Vec<hark_calendar::CalEvent>>,
+    pub calendar_errors: RwLock<Vec<String>>,
 }
 
 impl AppState {
@@ -67,6 +70,8 @@ impl AppState {
             downloads: Mutex::new(HashMap::new()),
             chat_cancels: Mutex::new(HashMap::new()),
             share_server: Mutex::new(None),
+            calendar: RwLock::new(Vec::new()),
+            calendar_errors: RwLock::new(Vec::new()),
         }
     }
 

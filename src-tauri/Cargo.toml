@@ -35,6 +35,8 @@ hark-asr = { path = "../crates/hark-asr" }
 hark-diarize = { path = "../crates/hark-diarize" }
 hark-llm = { path = "../crates/hark-llm" }
 hark-share = { path = "../crates/hark-share" }
+hark-calendar = { path = "../crates/hark-calendar" }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

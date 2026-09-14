@@ -15,6 +15,9 @@ export function SettingsPage() {
   const [levels, setLevels] = useState<[number, number]>([-100, -100]);
   const [hw, setHw] = useState<{ hardware: Hardware; tier: Tier; effective_tier: Tier } | null>(null);
   const [models, setModels] = useState<ModelRow[]>([]);
+  const [calendarDraft, setCalendarDraft] = useState("");
+  const [calendarErrors, setCalendarErrors] = useState<string[]>([]);
+  const [calendarCount, setCalendarCount] = useState<number | null>(null);
   const [progress, setProgress] = useState<Record<string, { done: number; total: number; error?: string | null }>>({});
   const [data, setData] = useState<{ data_dir: string; recordings_bytes: number; models_bytes: number } | null>(null);
   const [hotkeyDraft, setHotkeyDraft] = useState("");
@@ -29,6 +32,7 @@ export function SettingsPage() {
     void cmd.getSettings().then((x) => {
       setS(x);
       setHotkeyDraft(x.hotkey);
+      setCalendarDraft(x.calendar_sources.join("\n"));
     });
     void cmd.listAudioDevices().then(setDevices);
     void cmd.probeHardware().then(setHw);
@@ -279,6 +283,32 @@ export function SettingsPage() {
         <SectionTitle hint="Markdown prompts the summary is written from">Summary templates</SectionTitle>
         <Card className="p-5">
           <TemplatesEditor defaultId={s.default_template_id} onDefaultChange={(id) => void update({ default_template_id: id })} />
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <SectionTitle hint="Names recordings after the event you are in and seeds attendees">Calendar</SectionTitle>
+        <Card className="px-5 py-4 text-[13px]">
+          <p className="text-ink-3">
+            Paste a private .ics link (Google Calendar: Settings &rarr; your calendar &rarr; "Secret address in iCal format"; Outlook: Settings &rarr; Shared calendars &rarr; Publish) or a path to an .ics file. Hark fetches only these addresses, every {s.calendar_refresh_min} minutes.
+          </p>
+          <textarea
+            value={calendarDraft}
+            onChange={(e) => setCalendarDraft(e.target.value)}
+            onBlur={() => {
+              const list = calendarDraft.split("\n").map((l) => l.trim()).filter(Boolean);
+              if (JSON.stringify(list) !== JSON.stringify(s.calendar_sources)) void update({ calendar_sources: list }).then(() => cmd.refreshCalendar().then(setCalendarErrors));
+            }}
+            placeholder={"https://calendar.google.com/calendar/ical/.../private-.../basic.ics\nC:\\Users\\me\\work.ics"}
+            rows={3}
+            spellCheck={false}
+            className="focus-ring mt-3 w-full rounded-md border border-line-2 bg-canvas px-3 py-2 font-mono text-[12px] text-ink placeholder:text-ink-3"
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => void cmd.refreshCalendar().then((e) => { setCalendarErrors(e); void cmd.listUpcoming(24 * 7).then((ev) => setCalendarCount(ev.length)); })}>Refresh now</Button>
+            {calendarCount !== null && <span className="text-ink-3">{calendarCount} events in the next 7 days</span>}
+          </div>
+          {calendarErrors.map((e) => <div key={e} className="mt-2 text-ember">{e}</div>)}
         </Card>
       </section>
 

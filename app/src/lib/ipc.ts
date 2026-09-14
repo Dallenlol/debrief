@@ -10,6 +10,16 @@ const listen: typeof tauriListen = isMock ? (async () => () => {}) as typeof tau
 
 export type MeetingStatus = "recording" | "processing" | "ready" | "failed";
 
+export interface CalEvent {
+  uid: string;
+  title: string;
+  start: string;
+  end: string;
+  attendees: string[];
+  url: string | null;
+  location: string | null;
+}
+
 export interface ParticipantsPayload {
   meeting_id: string;
   participants: string[];
@@ -105,6 +115,8 @@ export interface Settings {
   summary_enabled: boolean;
   default_template_id: string;
   share_port: number;
+  calendar_sources: string[];
+  calendar_refresh_min: number;
 }
 
 export interface Template {
@@ -242,6 +254,8 @@ export const cmd = {
   renameMeeting: (id: string, title: string) => invoke<Meeting>("rename_meeting", { id, title }),
   deleteMeeting: (id: string) => invoke<void>("delete_meeting", { id }),
   search: (query: string, limit = 50) => invoke<SearchHit[]>("search", { query, limit }),
+  listUpcoming: (hours?: number) => invoke<CalEvent[]>("list_upcoming", { hours }),
+  refreshCalendar: () => invoke<string[]>("refresh_calendar"),
   retranscribe: (id: string, model?: string | null) => invoke<void>("retranscribe", { id, model: model ?? null }),
   rediarize: (id: string) => invoke<void>("rediarize", { id }),
   reembed: (id: string) => invoke<void>("reembed", { id }),
@@ -315,7 +329,7 @@ export const cmd = {
 };
 
 export interface Events {
-  detection: { app: string; label: string; title: string; confidence: number };
+  detection: { app: string; label: string; title: string; confidence: number; event: string | null };
   levels: { mic_db: number; sys_db: number };
   caption: { start_ms: number; end_ms: number; text: string; is_final: boolean };
   recording_state: RecordingState;

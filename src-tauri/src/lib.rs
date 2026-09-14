@@ -1,3 +1,4 @@
+mod calendar;
 mod commands;
 mod detector_loop;
 mod embed_stage;
@@ -37,6 +38,7 @@ pub fn run() {
                 log::warn!("hotkey: {e}");
             }
             detector_loop::spawn(handle.clone());
+            calendar::spawn(handle.clone());
             spawn_engine_idle_unloader(handle.clone());
             {
                 let st = handle.state::<AppState>();
@@ -76,6 +78,8 @@ pub fn run() {
             commands::meetings::delete_meeting,
             commands::meetings::search,
             commands::meetings::retranscribe,
+            commands::meetings::list_upcoming,
+            commands::meetings::refresh_calendar,
             commands::meetings::rediarize,
             commands::meetings::reembed,
             commands::recording::start_recording,

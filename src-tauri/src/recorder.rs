@@ -54,8 +54,18 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
         return Err("already recording".into());
     }
     let settings = state.settings.read().clone();
-    let title = opts.title.clone().unwrap_or_else(|| default_title(opts.app.as_deref()));
+    let event = crate::calendar::current_event(&state);
+    let title = opts
+        .title
+        .clone()
+        .or_else(|| event.as_ref().map(|e| e.title.clone()))
+        .unwrap_or_else(|| default_title(opts.app.as_deref()));
     let mut meeting = Meeting::new_recording(&title, opts.app.as_deref());
+    if let Some(e) = &event {
+        meeting.calendar_uid = Some(e.uid.clone());
+        meeting.participants = e.attendees.iter().filter(|a| !a.eq_ignore_ascii_case(settings.user_name.trim())).cloned().collect();
+        log::info!("recorder: matched calendar event '{}'", e.title);
+    }
     let want_video = opts.video.unwrap_or(settings.video_enabled);
     let dir = state.store.recordings_dir(&meeting.id);
 

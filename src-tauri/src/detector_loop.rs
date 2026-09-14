@@ -72,7 +72,13 @@ fn run(app: AppHandle) {
             log::info!("meeting detected: {} ({})", d.label, d.title);
             let _ = app.emit(
                 events::DETECTION,
-                DetectionPayload { app: d.app.clone(), label: d.label.clone(), title: d.title.clone(), confidence: d.confidence },
+                DetectionPayload {
+                    app: d.app.clone(),
+                    label: d.label.clone(),
+                    title: d.title.clone(),
+                    confidence: d.confidence,
+                    event: crate::calendar::current_event(&app.state::<AppState>()).map(|e| e.title),
+                },
             );
             windows::show_popup(&app);
         }

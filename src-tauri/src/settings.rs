@@ -38,6 +38,9 @@ pub struct Settings {
     pub summary_enabled: bool,
     pub default_template_id: String,
     pub share_port: u16,
+    /// .ics URLs (Google "secret address", Outlook "publish calendar") or local files.
+    pub calendar_sources: Vec<String>,
+    pub calendar_refresh_min: u64,
 }
 
 impl Default for Settings {
@@ -72,6 +75,8 @@ impl Default for Settings {
             summary_enabled: true,
             default_template_id: "general".into(),
             share_port: 47123,
+            calendar_sources: Vec::new(),
+            calendar_refresh_min: 15,
         }
     }
 }

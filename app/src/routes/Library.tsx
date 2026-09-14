@@ -1,11 +1,11 @@
-import { Search, Video } from "lucide-react";
+import { CalendarDays, Circle, Search, Video } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { EmptyState } from "@/components/EmptyState";
 import { FolderTree, type Selection } from "@/components/FolderTree";
 import { Badge, Button, Input } from "@/components/ui";
 import { appLabel, fmtDate, fmtDuration, fmtTime } from "@/lib/format";
-import { cmd, subscribe, type Folder, type Meeting, type SearchHit, type Tag } from "@/lib/ipc";
+import { cmd, subscribe, type CalEvent, type Folder, type Meeting, type SearchHit, type Tag } from "@/lib/ipc";
 
 const STATUS_TONE = { recording: "ember", processing: "amber", ready: "moss", failed: "ember" } as const;
 
@@ -16,7 +16,15 @@ export function Library() {
   const [selection, setSelection] = useState<Selection>({ kind: "all" });
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const [upcoming, setUpcoming] = useState<CalEvent[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const load = () => void cmd.listUpcoming(12).then(setUpcoming).catch(() => setUpcoming([]));
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const reload = useCallback(() => {
     const filter =
@@ -81,6 +89,30 @@ export function Library() {
             <Input placeholder="Search transcripts and titles" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" />
           </div>
         </header>
+
+        {!hits && selection.kind === "all" && upcoming.length > 0 && (
+          <section className="mb-6">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-ink-3 uppercase"><CalendarDays size={12} /> Today</div>
+            <ul className="flex flex-col gap-1">
+              {upcoming.slice(0, 4).map((e) => {
+                const start = new Date(e.start).getTime();
+                const live = start - 10 * 60_000 <= Date.now() && Date.now() <= new Date(e.end).getTime();
+                return (
+                  <li key={`${e.uid}-${e.start}`} className="flex items-center gap-3 rounded-md border border-line px-3 py-2 text-[13px]">
+                    <span className="w-14 shrink-0 font-mono text-[12px] text-ink-3">{fmtTime(e.start)}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{e.title}</span>
+                    {e.attendees.length > 0 && <span className="hidden truncate text-[12px] text-ink-3 md:inline">{e.attendees.slice(0, 3).join(", ")}{e.attendees.length > 3 ? ` +${e.attendees.length - 3}` : ""}</span>}
+                    {live ? (
+                      <Button variant="ember" size="sm" onClick={() => void cmd.startRecording({ title: e.title })}><Circle size={10} fill="currentColor" /> Record</Button>
+                    ) : (
+                      <span className="text-[12px] text-ink-3">in {Math.max(1, Math.round((start - Date.now()) / 60_000))} min</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {hits ? (
           <ul className="flex flex-col gap-1">

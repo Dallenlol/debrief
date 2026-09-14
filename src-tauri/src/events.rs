@@ -25,6 +25,8 @@ pub struct DetectionPayload {
     pub label: String,
     pub title: String,
     pub confidence: f32,
+    /// Title of the calendar event happening now, if any.
+    pub event: Option<String>,
 }
 
 #[derive(Serialize, Clone)]

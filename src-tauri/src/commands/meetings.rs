@@ -73,6 +73,18 @@ pub fn retranscribe(app: AppHandle, id: String, model: Option<String>) -> CmdRes
     recorder::retranscribe(&app, &id, model)
 }
 
+/// Calendar events from 10 minutes ago to `hours` ahead (default 12).
+#[tauri::command]
+pub fn list_upcoming(state: State<AppState>, hours: Option<i64>) -> Vec<hark_calendar::CalEvent> {
+    crate::calendar::upcoming(&state, hours.unwrap_or(12))
+}
+
+/// Re-fetch every calendar source now; returns per-source errors.
+#[tauri::command]
+pub async fn refresh_calendar(app: AppHandle) -> CmdResult<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || crate::calendar::refresh(&app)).await.map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn rediarize(app: AppHandle, id: String) -> CmdResult<()> {
     std::thread::spawn(move || {

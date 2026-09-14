@@ -9,10 +9,6 @@ description = "Sidecar: speaker diarization + voiceprints via sherpa-onnx (WAV i
 name = "hark-diarize"
 path = "src/main.rs"
 
-[features]
-default = []
-cuda = ["sherpa-rs/cuda"]
-
 [dependencies]
 sherpa-rs = { version = "0.6", default-features = false, features = ["download-binaries"] }
 hark-diarize = { path = "../hark-diarize" }

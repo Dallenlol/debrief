@@ -43,10 +43,11 @@ if (!existsSync(ffmpegOut)) {
     const found = findFile(dir, "ffmpeg.exe");
     copyFileSync(found, ffmpegOut);
   } else if (mac) {
-    const zip = path.join(cache, "ffmpeg-mac.zip");
+    const arch = triple.startsWith("aarch64") ? "arm64" : "amd64";
+    const zip = path.join(cache, `ffmpeg-mac-${arch}.zip`);
     if (!existsSync(zip)) {
-      log("downloading ffmpeg (evermeet.cc)...");
-      await download("https://evermeet.cc/ffmpeg/getrelease/zip", zip);
+      log(`downloading ffmpeg (ffmpeg.martin-riedl.de, ${arch} static build)...`);
+      await download(`https://ffmpeg.martin-riedl.de/redirect/latest/macos/${arch}/release/ffmpeg.zip`, zip);
     }
     const dir = path.join(cache, "ffmpeg-mac");
     rmSync(dir, { recursive: true, force: true });
@@ -66,8 +67,10 @@ if (!existsSync(ffmpegOut)) {
 // 2. diarize sidecar
 const profileArgs = profile === "release" ? ["--release"] : ["--profile", profile];
 const featArgs = features ? ["--features", features] : [];
+// The sidecar always uses sherpa's prebuilt CPU binaries (its CUDA feature conflicts with them,
+// and diarization is quick on CPU).
 log(`building hark-diarize sidecar (${profile})...`);
-execFileSync("cargo", ["build", "-p", "hark-diarize-cli", ...profileArgs, ...featArgs], { stdio: "inherit", cwd: root });
+execFileSync("cargo", ["build", "-p", "hark-diarize-cli", ...profileArgs], { stdio: "inherit", cwd: root });
 const targetDir = path.join(root, "target", profile);
 copyFileSync(path.join(targetDir, `hark-diarize${exe}`), path.join(binDir, `hark-diarize-${triple}${exe}`));
 log("hark-diarize sidecar copied");
@@ -87,7 +90,7 @@ for (const f of readdirSync(targetDir)) {
 log(`${n} runtime libraries -> src-tauri/resources`);
 
 async function download(url, dest) {
-  const res = await fetch(url, { redirect: "follow" });
+  const res = await fetch(url, { redirect: "follow", headers: { "user-agent": "hark-prepare-bundle" } });
   if (!res.ok) throw new Error(`download ${url}: ${res.status}`);
   await pipeline(res.body, createWriteStream(dest));
 }

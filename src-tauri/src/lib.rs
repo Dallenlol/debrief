@@ -37,6 +37,17 @@ pub fn run() {
             }
             detector_loop::spawn(handle.clone());
             spawn_engine_idle_unloader(handle.clone());
+            {
+                let st = handle.state::<AppState>();
+                let any_share = st.store.list_shares().map(|s| s.iter().any(|x| x.enabled)).unwrap_or(false);
+                if any_share {
+                    let port = st.settings.read().share_port;
+                    match hark_share::ShareServer::start(st.store.clone(), st.store.root().join("clips"), port) {
+                        Ok(h) => *st.share_server.lock() = Some(h),
+                        Err(e) => log::warn!("share server: {e}"),
+                    }
+                }
+            }
             log::info!("Hark started; data dir {}", hark_store::data_dir().display());
             if handle.state::<AppState>().ffmpeg.is_none() {
                 log::warn!("ffmpeg sidecar not found; screen video disabled");
@@ -98,6 +109,25 @@ pub fn run() {
             commands::ai::chat_messages,
             commands::ai::send_chat,
             commands::ai::cancel_chat,
+            commands::organize::list_folders,
+            commands::organize::create_folder,
+            commands::organize::update_folder,
+            commands::organize::delete_folder,
+            commands::organize::move_meeting,
+            commands::organize::list_meetings_filtered,
+            commands::organize::list_tags,
+            commands::organize::meeting_tags,
+            commands::organize::tag_meeting,
+            commands::organize::untag_meeting,
+            commands::organize::export_clip,
+            commands::organize::create_share,
+            commands::organize::list_shares,
+            commands::organize::set_share_enabled,
+            commands::organize::delete_share,
+            commands::organize::export_meetings,
+            commands::organize::import_meetings,
+            commands::organize::export_html,
+            commands::organize::change_data_dir,
             commands::devices::list_audio_devices,
             commands::devices::sample_levels,
         ])

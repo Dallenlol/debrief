@@ -13,7 +13,7 @@ mod settings;
 mod speakers;
 
 pub use ai::{Chat, ChatMessage, ChunkHit, Summary, Template, CHUNK_MS};
-pub use db::{data_dir, Store};
+pub use db::{data_dir, default_data_dir, write_data_dir_pointer, Store};
 pub use meetings::{Meeting, MeetingStatus};
 pub use organize::{Folder, MeetingFilter, Share, Tag};
 pub use segments::{NewSegment, SearchHit, Segment};

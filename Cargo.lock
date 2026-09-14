@@ -1963,6 +1963,7 @@ dependencies = [
  "hark-diarize",
  "hark-llm",
  "hark-models",
+ "hark-share",
  "hark-store",
  "hound",
  "log",

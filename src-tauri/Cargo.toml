@@ -34,6 +34,7 @@ hark-models = { path = "../crates/hark-models" }
 hark-asr = { path = "../crates/hark-asr" }
 hark-diarize = { path = "../crates/hark-diarize" }
 hark-llm = { path = "../crates/hark-llm" }
+hark-share = { path = "../crates/hark-share" }
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

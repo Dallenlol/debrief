@@ -37,6 +37,7 @@ pub struct Settings {
     pub diarize_enabled: bool,
     pub summary_enabled: bool,
     pub default_template_id: String,
+    pub share_port: u16,
 }
 
 impl Default for Settings {
@@ -70,6 +71,7 @@ impl Default for Settings {
             diarize_enabled: true,
             summary_enabled: true,
             default_template_id: "general".into(),
+            share_port: 47123,
         }
     }
 }

@@ -36,6 +36,8 @@ pub struct AppState {
     pub downloads: Mutex<HashMap<String, Arc<AtomicBool>>>,
     /// Streaming chat replies in flight, by chat id.
     pub chat_cancels: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// LAN share server, running only while at least one share is enabled.
+    pub share_server: Mutex<Option<hark_share::ShareServerHandle>>,
 }
 
 impl AppState {
@@ -61,6 +63,7 @@ impl AppState {
             diarize_bin: find_sidecar("hark-diarize"),
             downloads: Mutex::new(HashMap::new()),
             chat_cancels: Mutex::new(HashMap::new()),
+            share_server: Mutex::new(None),
         }
     }
 

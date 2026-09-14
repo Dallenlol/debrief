@@ -3,14 +3,38 @@ use parking_lot::Mutex;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 
-/// Root of all Hark data. `%APPDATA%\Hark` on Windows,
+/// Default location: `%APPDATA%\Hark` on Windows,
 /// `~/Library/Application Support/Hark` on macOS, `~/.local/share/hark` elsewhere.
-/// Created on first call.
-pub fn data_dir() -> PathBuf {
+pub fn default_data_dir() -> PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
-    let dir = if cfg!(target_os = "linux") { base.join("hark") } else { base.join("Hark") };
+    if cfg!(target_os = "linux") { base.join("hark") } else { base.join("Hark") }
+}
+
+const POINTER_FILE: &str = "data-dir.txt";
+
+/// Root of all Hark data. The default location may hold a `data-dir.txt`
+/// pointer to a user-chosen folder (see `write_data_dir_pointer`). Created on first call.
+pub fn data_dir() -> PathBuf {
+    let default = default_data_dir();
+    let dir = std::fs::read_to_string(default.join(POINTER_FILE))
+        .ok()
+        .map(|s| PathBuf::from(s.trim()))
+        .filter(|p| !p.as_os_str().is_empty() && p.is_dir())
+        .unwrap_or(default);
     let _ = std::fs::create_dir_all(&dir);
     dir
+}
+
+/// Point future launches at `dir` (pass the default dir to clear the override).
+pub fn write_data_dir_pointer(dir: &Path) -> std::io::Result<()> {
+    let default = default_data_dir();
+    std::fs::create_dir_all(&default)?;
+    if dir == default {
+        let _ = std::fs::remove_file(default.join(POINTER_FILE));
+        Ok(())
+    } else {
+        std::fs::write(default.join(POINTER_FILE), dir.to_string_lossy().as_bytes())
+    }
 }
 
 pub struct Store {
@@ -42,6 +66,12 @@ impl Store {
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Fold the WAL into the main database file (before copying it elsewhere).
+    pub fn checkpoint(&self) -> Result<()> {
+        self.conn.lock().execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
+        Ok(())
     }
 
     pub fn models_dir(&self) -> PathBuf {

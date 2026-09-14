@@ -1,0 +1,23 @@
+[package]
+name = "hark-share"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Export/import bundles and the LAN share server"
+
+[dependencies]
+hark-store = { path = "../hark-store" }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "fs", "io-util", "macros", "sync"] }
+tower-http = { version = "0.6", features = ["fs"] }
+tower = { version = "0.5", features = ["util"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+local-ip-address = "0.6"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+html-escape = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true

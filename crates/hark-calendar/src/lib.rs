@@ -34,8 +34,10 @@ fn unfold(src: &str) -> Vec<String> {
     out
 }
 
+type Params = Vec<(String, String)>;
+
 /// `(name, params, value)`; params as `(key, value)` pairs, keys upper-cased.
-fn split_line(line: &str) -> Option<(String, Vec<(String, String)>, String)> {
+fn split_line(line: &str) -> Option<(String, Params, String)> {
     let colon = find_value_colon(line)?;
     let (head, value) = (&line[..colon], &line[colon + 1..]);
     let mut parts = head.split(';');

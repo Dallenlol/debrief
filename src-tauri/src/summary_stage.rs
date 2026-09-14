@@ -67,7 +67,7 @@ pub fn run_summary(app: &AppHandle, meeting_id: &str, template_id: Option<&str>)
 
     // ~24k chars (~6k tokens) per model call keeps 8k-context models safe; longer
     // transcripts are condensed block by block first (see hark_llm::chunked).
-    let emit_p = emit.clone();
+    let emit_p = *emit;
     let progress = move |done: usize, total: usize| emit_p("summary", 0.9 + 0.08 * (done as f32 / total.max(1) as f32), None);
     match hark_llm::summary::generate_with_progress(backend.as_ref(), &template.body, &vars, 24_000, progress) {
         Ok(r) => {

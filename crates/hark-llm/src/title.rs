@@ -24,7 +24,7 @@ pub fn generate(backend: &dyn LlmBackend, transcript: &str, app_label: Option<&s
 /// Strip quotes, "Title:" prefixes, markdown and trailing punctuation; cap the length.
 pub fn sanitize_title(raw: &str) -> Option<String> {
     let first = raw.lines().map(str::trim).find(|l| !l.is_empty())?;
-    let mut t = first.trim_start_matches(|c| c == '#' || c == '*' || c == '-').trim();
+    let mut t = first.trim_start_matches(['#', '*', '-']).trim();
     for prefix in ["Title:", "title:", "Meeting title:", "Meeting:"] {
         if let Some(rest) = t.strip_prefix(prefix) {
             t = rest.trim();

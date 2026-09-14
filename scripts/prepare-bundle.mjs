@@ -3,7 +3,7 @@
 //   src-tauri/binaries/ffmpeg-<triple>[.exe]        (downloaded, cached)
 //   src-tauri/binaries/hark-diarize-<triple>[.exe]  (built from crates/hark-diarize-cli)
 //   src-tauri/resources/*.dll|*.dylib               (llama.cpp + sherpa-onnx runtime libs)
-// Usage: node scripts/prepare-bundle.mjs [--features cuda|metal] [--profile release]
+// Usage: node scripts/prepare-bundle.mjs [--features cuda|metal] [--profile release] [--target <triple>]
 import { execFileSync } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readdirSync, copyFileSync, statSync, rmSync } from "node:fs";
 import { pipeline } from "node:stream/promises";
@@ -15,7 +15,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const features = args.includes("--features") ? args[args.indexOf("--features") + 1] : "";
 const profile = args.includes("--profile") ? args[args.indexOf("--profile") + 1] : "release";
-const triple = execFileSync("rustc", ["-vV"]).toString().match(/host: (\S+)/)[1];
+const hostTriple = execFileSync("rustc", ["-vV"]).toString().match(/host: (\S+)/)[1];
+const triple = args.includes("--target") ? args[args.indexOf("--target") + 1] : hostTriple;
+const targetArgs = triple === hostTriple ? [] : ["--target", triple];
 const win = process.platform === "win32";
 const mac = process.platform === "darwin";
 const exe = win ? ".exe" : "";
@@ -70,15 +72,15 @@ const featArgs = features ? ["--features", features] : [];
 // The sidecar always uses sherpa's prebuilt CPU binaries (its CUDA feature conflicts with them,
 // and diarization is quick on CPU).
 log(`building hark-diarize sidecar (${profile})...`);
-execFileSync("cargo", ["build", "-p", "hark-diarize-cli", ...profileArgs], { stdio: "inherit", cwd: root });
-const targetDir = path.join(root, "target", profile);
+execFileSync("cargo", ["build", "-p", "hark-diarize-cli", ...profileArgs, ...targetArgs], { stdio: "inherit", cwd: root });
+const targetDir = triple === hostTriple ? path.join(root, "target", profile) : path.join(root, "target", triple, profile);
 copyFileSync(path.join(targetDir, `hark-diarize${exe}`), path.join(binDir, `hark-diarize-${triple}${exe}`));
 log("hark-diarize sidecar copied");
 
 // 3. runtime libs (llama.cpp dynamic + sherpa-onnx): their sys crates copy the shared
 //    libraries into target/<profile> when built.
 log(`building hark-llm (${profile}) to collect runtime libraries...`);
-execFileSync("cargo", ["build", "-p", "hark-llm", ...profileArgs, ...featArgs], { stdio: "inherit", cwd: root });
+execFileSync("cargo", ["build", "-p", "hark-llm", ...profileArgs, ...featArgs, ...targetArgs], { stdio: "inherit", cwd: root });
 const libExt = win ? ".dll" : mac ? ".dylib" : ".so";
 let n = 0;
 for (const f of readdirSync(targetDir)) {

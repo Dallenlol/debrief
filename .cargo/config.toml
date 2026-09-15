@@ -1,0 +1,11 @@
+# Portable CPU baseline for the ggml builds (whisper.cpp is linked statically, so
+# its SIMD level ships inside hark.exe). GGML_NATIVE would compile for the build
+# machine's CPU - an AVX-512 host produces a binary that crashes with an illegal
+# instruction on every CPU without AVX-512. AVX2 + FMA + F16C covers x86 CPUs
+# from 2013 on; GPU builds (cuda/metal) offload the heavy work anyway.
+[env]
+GGML_NATIVE = "OFF"
+GGML_AVX = "ON"
+GGML_AVX2 = "ON"
+GGML_FMA = "ON"
+GGML_F16C = "ON"

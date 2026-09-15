@@ -67,6 +67,12 @@ pub fn run() {
                     }
                 }
             }
+            // The player streams mix.wav / screen.mp4 through the asset protocol; the
+            // config-file scope cannot know a user-chosen data folder, so allow it here.
+            let recordings = hark_store::data_dir().join("recordings");
+            if let Err(e) = handle.asset_protocol_scope().allow_directory(&recordings, true) {
+                log::warn!("asset scope: {e}");
+            }
             log::info!("Hark started; data dir {}", hark_store::data_dir().display());
             if handle.state::<AppState>().ffmpeg.is_none() {
                 log::warn!("ffmpeg sidecar not found; screen video disabled");

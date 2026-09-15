@@ -6,7 +6,11 @@
 - **Follow-up email.** Summary tab > Follow-up email drafts a short recap with decisions and owned action items from the notes (local model), in an editable box with Copy.
 - **Export.** Copy the transcript or summary; save the transcript as .txt, .srt subtitles, or notes + transcript as .md.
 - **Talk time.** A bar under the title shows who spoke how much; it follows the names you assign.
-- **Fix: renamed speakers now reach Ask Hark.** Naming "Speaker 2" as Sarah rebuilds the search index, so "what did Sarah agree to?" finds her lines. Previously chat kept seeing the old label.
+- **Fix: renamed speakers now reach Ask Hark.** Naming "Speaker 2" as Sarah rebuilds the search index, so "what did Sarah agree to?" finds her lines, and an existing summary is rewritten with the names a few seconds after you stop renaming. Previously chat and the summary kept the old labels.
+- **Fix: first run.** "Open Hark" at the end of onboarding bounced back to onboarding until the app was restarted.
+- **Fix: playback.** The player could not load the recording (asset scope did not match the data folder), so meetings played as 0:00.
+- **Fix: CPU installer on GPU machines.** The plain (non-CUDA) build picked the GPU-sized models whenever an NVIDIA card was present and then ran them on the CPU; it now sizes for the CPU.
+- **Build: portable CPU code.** whisper.cpp was compiled for the build machine's CPU (AVX-512 here), which crashes on CPUs without it; every build now targets AVX2 (2013+). CI cache key bumped.
 - Build: the workspace test run no longer breaks when the sherpa-onnx download cache is gone.
 
 ## 0.2.0 - 2026-09-14

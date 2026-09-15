@@ -34,11 +34,26 @@ pub fn rename_speaker(app: AppHandle, id: String, label: String, name: String) -
         let _ = state.store.set_setting(&format!("speaker_embeddings:{id}"), &map);
     }
     // Retrieval chunks bake the speaker label into their text; rebuild them (and
-    // their embeddings) so Ask Hark knows who the renamed voice is.
+    // their embeddings) so Ask Hark knows who the renamed voice is. An existing
+    // summary names speakers too, so refresh it once the renames stop coming.
+    let seq = {
+        let mut m = state.rename_seq.lock();
+        let e = m.entry(id.clone()).or_insert(0);
+        *e += 1;
+        *e
+    };
     let app2 = app.clone();
     std::thread::spawn(move || {
         if let Err(e) = pipeline::reembed(&app2, &id) {
             log::warn!("reembed after rename failed: {e}");
+        }
+        std::thread::sleep(std::time::Duration::from_secs(4));
+        let state = app2.state::<AppState>();
+        if state.rename_seq.lock().get(&id).copied() != Some(seq) {
+            return; // a later rename owns the refresh
+        }
+        if let Ok(Some(existing)) = state.store.get_summary(&id) {
+            crate::summary_stage::run_summary(&app2, &id, Some(&existing.template_id));
         }
     });
     Ok(speaker)

@@ -60,7 +60,7 @@ pub fn import(app: &AppHandle, path: &Path, title: Option<&str>) -> Result<Meeti
     }
     let ffmpeg = state.ffmpeg.clone().ok_or("ffmpeg is missing from this install, so files cannot be imported")?;
     let title = title.map(str::trim).filter(|t| !t.is_empty()).map(str::to_string).unwrap_or_else(|| title_from_path(path));
-    let mut meeting = Meeting::new_recording(&title, None);
+    let mut meeting = Meeting::new_recording(&title, Some("import"));
     meeting.status = MeetingStatus::Processing;
     meeting.title_auto = false; // the file name is the user's title until they change it
     if let Ok(md) = std::fs::metadata(path) {

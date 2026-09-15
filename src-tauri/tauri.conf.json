@@ -56,8 +56,7 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$APPDATA/Hark/**",
-          "$HOME/Library/Application Support/Hark/**",
+          "$CONFIG/Hark/**",
           "$APPDATA/**"
         ]
       }

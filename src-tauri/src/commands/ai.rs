@@ -97,7 +97,7 @@ pub async fn draft_followup(app: AppHandle, id: String) -> CmdResult<String> {
             participants: &if participants.is_empty() { "unknown".to_string() } else { participants.join(", ") },
             notes: &notes,
             notes_are_transcript,
-            sender: &settings.user_name,
+            sender: if settings.user_name.trim().eq_ignore_ascii_case("me") { "" } else { &settings.user_name },
         };
         hark_llm::followup::generate(backend.as_ref(), &input).map_err(|e| e.to_string())
     })

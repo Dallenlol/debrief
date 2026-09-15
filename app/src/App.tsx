@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createHashRouter, Navigate, RouterProvider } from "react-router-dom";
 import { Shell } from "@/components/Shell";
 import { Spinner } from "@/components/ui";
@@ -29,20 +29,24 @@ function MainApp() {
   useEffect(() => {
     cmd.getSettings().then((s) => setOnboarded(s.onboarded), () => setOnboarded(true));
   }, []);
+  // Onboarding flips this when it finishes, otherwise "/" would bounce straight back to it.
+  const router = useMemo(
+    () =>
+      createHashRouter([
+        { path: "/onboarding", element: <Onboarding onDone={() => setOnboarded(true)} /> },
+        {
+          path: "/",
+          element: onboarded ? <Shell /> : <Navigate to="/onboarding" replace />,
+          children: [
+            { index: true, element: <Library /> },
+            { path: "meeting/:id", element: <MeetingPage /> },
+            { path: "ask", element: <AskPage /> },
+            { path: "settings", element: <SettingsPage /> },
+          ],
+        },
+      ]),
+    [onboarded],
+  );
   if (onboarded === null) return <div className="grid h-full place-items-center"><Spinner /></div>;
-
-  const router = createHashRouter([
-    { path: "/onboarding", element: <Onboarding /> },
-    {
-      path: "/",
-      element: onboarded ? <Shell /> : <Navigate to="/onboarding" replace />,
-      children: [
-        { index: true, element: <Library /> },
-        { path: "meeting/:id", element: <MeetingPage /> },
-        { path: "ask", element: <AskPage /> },
-        { path: "settings", element: <SettingsPage /> },
-      ],
-    },
-  ]);
   return <RouterProvider router={router} />;
 }

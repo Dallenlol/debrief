@@ -3,6 +3,9 @@ use hark_models::Tier;
 use hark_store::Store;
 use serde::{Deserialize, Serialize};
 
+/// True when the binary was compiled with a GPU backend.
+pub const GPU_BUILD: bool = cfg!(any(feature = "cuda", feature = "metal"));
+
 pub const SETTINGS_KEY: &str = "settings";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -98,9 +101,16 @@ impl Settings {
         store.set_setting(SETTINGS_KEY, self)
     }
 
-    /// Effective tier: explicit override or hardware-selected.
+    /// Effective tier: explicit override or hardware-selected. A build without
+    /// CUDA/Metal cannot use a GPU, so it picks CPU-sized models even when one is present.
     pub fn tier(&self, hw: &hark_models::Hardware) -> Tier {
-        self.tier_override.unwrap_or_else(|| hark_models::select_tier(hw))
+        self.tier_override.unwrap_or_else(|| {
+            if GPU_BUILD {
+                hark_models::select_tier(hw)
+            } else {
+                hark_models::select_tier(&hark_models::Hardware { gpu: None, ..hw.clone() })
+            }
+        })
     }
 
     /// Model ids to use, falling back to the tier defaults.

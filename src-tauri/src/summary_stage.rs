@@ -101,6 +101,7 @@ fn app_label(app: &str) -> &str {
         "discord" => "Discord",
         "slack" => "Slack",
         "facetime" => "FaceTime",
+        "import" => "an imported file",
         other => other,
     }
 }

@@ -11,7 +11,7 @@ const TIER_COPY: Record<Tier, string> = {
   gpu: "GPU acceleration. Best transcripts and a strong local assistant.",
 };
 
-export function Onboarding() {
+export function Onboarding({ onDone }: { onDone?: () => void }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -50,6 +50,7 @@ export function Onboarding() {
 
   const finish = async () => {
     if (settings) await cmd.setSettings({ ...settings, onboarded: true });
+    onDone?.();
     navigate("/", { replace: true });
   };
 

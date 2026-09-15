@@ -23,7 +23,11 @@ pub struct FollowupInput<'a> {
 
 pub fn build_prompt(input: &FollowupInput) -> Vec<ChatMessage> {
     let kind = if input.notes_are_transcript { "Transcript (may be cut short)" } else { "Meeting notes" };
-    let signoff = if input.sender.trim().is_empty() { String::new() } else { format!("\nSign the email as {}.", input.sender.trim()) };
+    let signoff = if input.sender.trim().is_empty() {
+        "\nNo sender name is known: end with a plain closing line such as \"Thanks,\" and nothing after it.".to_string()
+    } else {
+        format!("\nSign the email as {}.", input.sender.trim())
+    };
     let user = format!(
         "Meeting: {}\nDate: {}\nParticipants: {}{signoff}\n\n{kind}:\n{}\n\nWrite the follow-up email now.",
         input.title, input.date, input.participants, input.notes

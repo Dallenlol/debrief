@@ -16,8 +16,11 @@ pub struct HardwareInfo {
 
 #[tauri::command]
 pub fn probe_hardware(state: State<AppState>) -> HardwareInfo {
-    let tier = hark_models::select_tier(&state.hardware);
-    let effective_tier = state.settings.read().tier(&state.hardware);
+    // `tier` = what Auto would pick (the UI marks it "Recommended"); it must
+    // agree with the effective tier when there is no override.
+    let settings = state.settings.read().clone();
+    let tier = crate::settings::Settings { tier_override: None, ..settings.clone() }.tier(&state.hardware);
+    let effective_tier = settings.tier(&state.hardware);
     HardwareInfo { hardware: state.hardware.clone(), tier, effective_tier }
 }
 

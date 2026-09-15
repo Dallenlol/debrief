@@ -39,6 +39,9 @@ pub struct AppState {
     pub downloads: Mutex<HashMap<String, Arc<AtomicBool>>>,
     /// Streaming chat replies in flight, by chat id.
     pub chat_cancels: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Per-meeting counter bumped on every speaker rename; lets the delayed
+    /// summary refresh run once after a burst of renames.
+    pub rename_seq: Mutex<HashMap<String, u64>>,
     /// LAN share server, running only while at least one share is enabled.
     pub share_server: Mutex<Option<hark_share::ShareServerHandle>>,
     /// Cached calendar events from the configured .ics sources.
@@ -69,6 +72,7 @@ impl AppState {
             diarize_bin: find_sidecar("hark-diarize"),
             downloads: Mutex::new(HashMap::new()),
             chat_cancels: Mutex::new(HashMap::new()),
+            rename_seq: Mutex::new(HashMap::new()),
             share_server: Mutex::new(None),
             calendar: RwLock::new(Vec::new()),
             calendar_errors: RwLock::new(Vec::new()),

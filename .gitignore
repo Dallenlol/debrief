@@ -10,7 +10,6 @@ src-tauri/binaries/
 *.part
 
 # machine-local toolchain pin
-.cargo/config.toml
 src-tauri/resources/*
 !src-tauri/resources/README.txt
 site/dist/

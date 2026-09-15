@@ -6,7 +6,9 @@ Everything runs on your machine. Hark chooses model sizes from what it finds:
 |---|---|---|---|---|
 | CPU, light | < 12 GB RAM, no GPU | Whisper base | Whisper small | Qwen3 1.7B |
 | CPU, roomy | 12 GB+ RAM, no GPU | Whisper small | Whisper medium | Qwen3 4B |
-| GPU | NVIDIA 6 GB+ VRAM or Apple Silicon | Whisper small | Whisper large-v3-turbo | Qwen3 8B |
+| GPU | NVIDIA 6 GB+ VRAM (CUDA build) or Apple Silicon | Whisper small | Whisper large-v3-turbo | Qwen3 8B |
+
+The plain Windows (CPU) installer never picks the GPU row, even on a machine with an NVIDIA card: it cannot use the card, and the GPU-sized models would crawl on the CPU. Install the CUDA build to use the card, or pick a tier by hand in Settings.
 
 Speaker identification always uses pyannote segmentation 3.0 (6 MB) and NeMo TitaNet small (40 MB). Semantic search in Ask Hark uses BGE small v1.5 (37 MB); without it, search is keyword-only.
 

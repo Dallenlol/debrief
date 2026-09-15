@@ -41,6 +41,7 @@ export function dbToLevel(db: number): number {
 }
 
 export const APP_LABELS: Record<string, string> = {
+  import: "Imported file",
   zoom: "Zoom",
   teams: "Teams",
   meet: "Google Meet",

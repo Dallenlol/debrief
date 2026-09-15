@@ -5,7 +5,7 @@
 Download from the [Releases page](https://github.com/Dallenlol/hark/releases):
 
 - **CUDA** installer if you have an NVIDIA GPU (much faster transcription and summaries).
-- **CPU** installer otherwise. Works on any 64-bit Windows 10/11 machine with 8 GB RAM.
+- **CPU** installer otherwise. Works on any 64-bit Windows 10/11 machine with 8 GB RAM and a CPU from 2013 or later (AVX2).
 
 Run the `.exe` (per-user install, no admin needed). Windows SmartScreen may warn because the build is not code-signed yet; choose "More info > Run anyway". If you prefer, verify the SHA-256 listed on the release.
 

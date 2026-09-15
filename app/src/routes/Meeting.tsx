@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, Check, Copy, Download, FolderOpen, Mail, Penc
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChatPanel } from "@/components/ChatPanel";
+import { LiveNotes, LiveTranscript, useLiveFeed } from "@/components/LiveView";
 import { Markdown } from "@/components/Markdown";
 import { Player, type PlayerHandle } from "@/components/Player";
 import { ShareDialog } from "@/components/ShareDialog";
@@ -52,6 +53,7 @@ export function MeetingPage() {
   const [followupBusy, setFollowupBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const player = useRef<PlayerHandle>(null);
+  const live = useLiveFeed(id, detail?.meeting.status === "recording");
 
   const say = (msg: string) => {
     setFlash(msg);
@@ -81,6 +83,10 @@ export function MeetingPage() {
   useEffect(() => subscribe("participants", (p) => {
     if (p.meeting_id === id) setDetail((d) => (d ? { ...d, meeting: { ...d.meeting, participants: p.participants } } : d));
   }), [id]);
+
+  useEffect(() => subscribe("recording_state", (s) => {
+    if (s.state === "idle") load();
+  }), [load]);
 
   useEffect(() => {
     load();
@@ -115,6 +121,7 @@ export function MeetingPage() {
 
   const m = detail.meeting;
   const processing = m.status === "processing" || stage !== null;
+  const recording = m.status === "recording";
   const hasClean = detail.segments.some((s) => s.clean_text);
   const useClean = (view ?? "clean") === "clean" && hasClean;
   const speakers = detail.speakers.filter((sp) => !dismissed.includes(sp.label));
@@ -331,7 +338,15 @@ export function MeetingPage() {
 
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8">
         <div className="sticky top-6 self-start">
-          <Player ref={player} audio={detail.media.audio} video={detail.media.video} highlights={detail.highlights} onTime={onTime} />
+          {recording ? (
+            <div className="rounded-lg border border-line bg-canvas-2 p-5">
+              <div className="inline-flex items-center gap-2 text-[13px] font-medium text-ember"><span className="h-2 w-2 animate-pulse rounded-full bg-ember" /> Recording in progress</div>
+              <p className="mt-2 text-[13px] text-ink-2">Captions and notes update as people talk. The full transcript with speaker names, the summary and Ask Hark arrive once you stop.</p>
+              <Button variant="ember" size="sm" className="mt-4" onClick={() => void cmd.stopRecording().catch((e) => alert(String(e)))}>Stop recording</Button>
+            </div>
+          ) : (
+            <Player ref={player} audio={detail.media.audio} video={detail.media.video} highlights={detail.highlights} onTime={onTime} />
+          )}
           {detail.highlights.length > 0 && (
             <div className="mt-6">
               <SectionTitle>Highlights</SectionTitle>
@@ -355,7 +370,10 @@ export function MeetingPage() {
                 </button>
               ))}
             </div>
-            {tab === "transcript" && (processing ? (
+            {tab === "transcript" && recording && (
+              <span className="inline-flex items-center gap-2 text-[12px] text-ember"><span className="h-2 w-2 animate-pulse rounded-full bg-ember" /> recording</span>
+            )}
+            {tab === "transcript" && !recording && (processing ? (
               <span className="inline-flex items-center gap-2 text-[12px] text-ink-3"><Spinner className="h-3 w-3" /> {stage ?? "processing"}</span>
             ) : hasClean ? (
               <span className="inline-flex rounded-md bg-canvas-3 p-0.5 text-[11px] font-medium">
@@ -370,7 +388,13 @@ export function MeetingPage() {
             ))}
           </div>
 
-          {tab === "transcript" && (
+          {tab === "transcript" && recording && <LiveTranscript finals={live?.finals ?? []} partial={live?.partial ?? null} />}
+          {tab === "summary" && recording && <LiveNotes notes={live?.notes ?? ""} updatedMs={live?.notes_updated_ms ?? null} />}
+          {tab === "chat" && recording && (
+            <p className="text-sm text-ink-3">Ask Hark opens once the recording stops and the transcript is ready.</p>
+          )}
+
+          {tab === "transcript" && !recording && (
             detail.segments.length === 0 && processing ? (
               <p className="text-sm text-ink-3">Transcribing... this usually takes well under a minute.</p>
             ) : detail.segments.length === 0 ? (
@@ -392,7 +416,7 @@ export function MeetingPage() {
             )
           )}
 
-          {tab === "summary" && (
+          {tab === "summary" && !recording && (
             <div>
               <div className="mb-4 flex items-center gap-2">
                 <select
@@ -440,7 +464,7 @@ export function MeetingPage() {
             </div>
           )}
 
-          {tab === "chat" && (
+          {tab === "chat" && !recording && (
             <ChatPanel scopeKind="meeting" scopeId={m.id} onSeek={(ms) => player.current?.seek(ms)} className="min-h-[60vh] flex-1" />
           )}
         </div>

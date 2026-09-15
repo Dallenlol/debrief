@@ -279,6 +279,7 @@ export const cmd = {
   resumeRecording: () => invoke<void>("resume_recording"),
   markHighlight: () => invoke<number>("mark_highlight"),
   recordingStatus: () => invoke<RecordingState>("recording_status"),
+  liveSnapshot: () => invoke<LiveSnapshot | null>("live_snapshot"),
   dismissDetection: (appId: string, mode: "now" | "never" | "snooze") =>
     invoke<void>("dismiss_detection", { appId, mode }),
   openMain: () => invoke<void>("open_main"),
@@ -342,10 +343,27 @@ export const cmd = {
     invoke<[number, number]>("sample_levels", { mic, loopback }),
 };
 
+export interface Caption {
+  start_ms: number;
+  end_ms: number;
+  text: string;
+  is_final: boolean;
+}
+
+/** Captions and running notes of the recording in progress. */
+export interface LiveSnapshot {
+  meeting_id: string;
+  finals: Caption[];
+  partial: Caption | null;
+  notes: string;
+  notes_updated_ms: number | null;
+}
+
 export interface Events {
   detection: { app: string; label: string; title: string; confidence: number; event: string | null };
   levels: { mic_db: number; sys_db: number };
-  caption: { start_ms: number; end_ms: number; text: string; is_final: boolean };
+  caption: Caption;
+  live_notes: { meeting_id: string; notes: string; updated_ms: number };
   recording_state: RecordingState;
   model_progress: { id: string; done: number; total: number; status: "downloading" | "done" | "failed"; error: string | null };
   processing: { meeting_id: string; stage: string; progress: number; error: string | null };

@@ -8,6 +8,7 @@ mod recorder;
 mod settings;
 mod shortcuts;
 mod import;
+mod live_feed;
 mod smoke;
 mod state;
 mod summary_stage;
@@ -53,6 +54,7 @@ pub fn run() {
             if let Err(e) = shortcuts::register(&handle, &hotkey) {
                 log::warn!("hotkey: {e}");
             }
+            recorder::recover_orphans(&handle);
             detector_loop::spawn(handle.clone());
             calendar::spawn(handle.clone());
             spawn_engine_idle_unloader(handle.clone());
@@ -111,6 +113,7 @@ pub fn run() {
             commands::recording::resume_recording,
             commands::recording::mark_highlight,
             commands::recording::recording_status,
+            commands::recording::live_snapshot,
             commands::recording::dismiss_detection,
             commands::recording::open_main,
             commands::settings::get_settings,

@@ -16,11 +16,11 @@ pub fn sample_levels(mic_id: Option<&str>, loopback_id: Option<&str>, dur: Durat
 
     let _mic = find_device(mic_id, false).and_then(|d| {
         let b = mic_buf.clone();
-        open_input(&d, false, Arc::new(move |p| b.lock().extend_from_slice(p)), noop_err.clone()).ok()
+        open_input(&d, false, 48_000, Arc::new(move |p| b.lock().extend_from_slice(p)), noop_err.clone()).ok()
     });
     let _sys = find_device(loopback_id, true).and_then(|d| {
         let b = sys_buf.clone();
-        open_input(&d, true, Arc::new(move |p| b.lock().extend_from_slice(p)), noop_err.clone()).ok()
+        open_input(&d, true, 48_000, Arc::new(move |p| b.lock().extend_from_slice(p)), noop_err.clone()).ok()
     });
     std::thread::sleep(dur);
     let mic = rms_db(&mic_buf.lock());

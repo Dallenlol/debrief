@@ -8,6 +8,7 @@ pub mod chunked;
 pub mod cleanup;
 pub mod embed;
 pub mod followup;
+pub mod live_notes;
 pub mod llama;
 pub mod openai;
 pub mod prompts;

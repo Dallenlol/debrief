@@ -62,13 +62,20 @@ impl WhisperEngine {
     /// exceeds `max_len` characters (0 = whisper's default segmentation).
     /// Short segments make speaker assignment much more precise.
     pub fn transcribe_with(&self, pcm16k: &[f32], offset_ms: i64, lang: Option<&str>, is_final: bool, max_len: i32) -> Result<Vec<Caption>, AsrError> {
+        Ok(self.transcribe_opts(pcm16k, &TranscribeOpts { offset_ms, lang, is_final, max_len, ..TranscribeOpts::default() })?.captions)
+    }
+
+    /// Full-control transcription: optional prompt (text that came just before
+    /// this audio, for continuity), a no-speech cut-off, and the language whisper
+    /// settled on (useful to lock the language for the rest of a live session).
+    pub fn transcribe_opts(&self, pcm16k: &[f32], o: &TranscribeOpts) -> Result<Transcribed, AsrError> {
         if pcm16k.len() < 1600 {
-            return Ok(Vec::new());
+            return Ok(Transcribed::default());
         }
         let mut state = self.ctx.create_state().map_err(|e| AsrError::Whisper(e.to_string()))?;
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_n_threads(self.threads);
-        params.set_language(lang);
+        params.set_language(o.lang);
         params.set_translate(false);
         params.set_no_context(true);
         params.set_single_segment(false);
@@ -79,26 +86,57 @@ impl WhisperEngine {
         params.set_suppress_blank(true);
         params.set_suppress_nst(true);
         params.set_token_timestamps(true);
-        params.set_max_len(max_len);
-        params.set_split_on_word(max_len > 0);
+        params.set_max_len(o.max_len);
+        params.set_split_on_word(o.max_len > 0);
+        if let Some(p) = o.prompt.filter(|p| !p.trim().is_empty()) {
+            params.set_initial_prompt(p);
+        }
         state.full(params, pcm16k).map_err(|e| AsrError::Whisper(e.to_string()))?;
 
+        let lang = whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
         let mut out = Vec::new();
         for seg in state.as_iter() {
             let text = seg.to_str_lossy().map(|c| c.trim().to_string()).unwrap_or_default();
             if text.is_empty() || is_noise_marker(&text) {
                 continue;
             }
+            if let Some(max) = o.drop_no_speech_above {
+                if seg.no_speech_probability() > max {
+                    continue;
+                }
+            }
             // whisper timestamps are in 10 ms units.
             out.push(Caption {
-                start_ms: seg.start_timestamp() * 10 + offset_ms,
-                end_ms: seg.end_timestamp() * 10 + offset_ms,
+                start_ms: seg.start_timestamp() * 10 + o.offset_ms,
+                end_ms: seg.end_timestamp() * 10 + o.offset_ms,
                 text,
-                is_final,
+                is_final: o.is_final,
             });
         }
-        Ok(out)
+        Ok(Transcribed { captions: out, lang })
     }
+}
+
+/// Options for [`WhisperEngine::transcribe_opts`].
+#[derive(Debug, Clone, Default)]
+pub struct TranscribeOpts<'a> {
+    pub offset_ms: i64,
+    /// ISO code like "en"; `None` = auto-detect.
+    pub lang: Option<&'a str>,
+    pub is_final: bool,
+    /// Max characters per segment (0 = whisper's own segmentation).
+    pub max_len: i32,
+    /// Text spoken just before this audio; keeps names and phrasing consistent.
+    pub prompt: Option<&'a str>,
+    /// Drop segments whose no-speech probability exceeds this (hallucination guard).
+    pub drop_no_speech_above: Option<f32>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Transcribed {
+    pub captions: Vec<Caption>,
+    /// Language whisper decided on (auto-detect) or was told.
+    pub lang: Option<String>,
 }
 
 /// whisper emits bracketed markers for non-speech; drop them.

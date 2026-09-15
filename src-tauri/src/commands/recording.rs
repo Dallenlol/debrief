@@ -8,18 +8,28 @@ use hark_store::Meeting;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
+// Start and stop open/close audio devices and join capture threads; they run
+// off the main thread so a slow or dead device can never freeze the window.
 #[tauri::command]
-pub fn start_recording(app: AppHandle, opts: Option<StartOptions>) -> CmdResult<Meeting> {
-    let m = recorder::start(&app, opts.unwrap_or_default())?;
-    tray::refresh(&app);
-    Ok(m)
+pub async fn start_recording(app: AppHandle, opts: Option<StartOptions>) -> CmdResult<Meeting> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let m = recorder::start(&app, opts.unwrap_or_default())?;
+        tray::refresh(&app);
+        Ok(m)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn stop_recording(app: AppHandle) -> CmdResult<Meeting> {
-    let m = recorder::stop(&app)?;
-    tray::refresh(&app);
-    Ok(m)
+pub async fn stop_recording(app: AppHandle) -> CmdResult<Meeting> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let m = recorder::stop(&app)?;
+        tray::refresh(&app);
+        Ok(m)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -40,6 +50,12 @@ pub fn mark_highlight(app: AppHandle) -> CmdResult<u64> {
 #[tauri::command]
 pub fn recording_status(app: AppHandle) -> RecordingStatePayload {
     recorder::status_payload(&app.state::<AppState>())
+}
+
+/// Captions and running notes of the recording in progress (None when idle).
+#[tauri::command]
+pub fn live_snapshot(app: AppHandle) -> Option<crate::live_feed::LiveSnapshot> {
+    crate::live_feed::LiveFeed::snapshot(&app.state::<AppState>())
 }
 
 /// `mode`: "now" hides the popup; "never" also adds the app to the never-list;

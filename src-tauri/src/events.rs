@@ -12,6 +12,7 @@ pub const NOTICE: &str = "notice";
 pub const CHAT_TOKEN: &str = "chat_token";
 pub const CHAT_DONE: &str = "chat_done";
 pub const PARTICIPANTS: &str = "participants";
+pub const LIVE_NOTES: &str = "live_notes";
 
 #[derive(Serialize, Clone)]
 pub struct ParticipantsPayload {

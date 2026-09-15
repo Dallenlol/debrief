@@ -29,6 +29,8 @@ pub struct AppState {
     pub hardware: Hardware,
     pub catalog: Catalog,
     pub recording: Mutex<Option<ActiveRecording>>,
+    /// Captions + running notes of the recording in progress (for the Meeting page).
+    pub live_feed: Mutex<Option<crate::live_feed::LiveFeed>>,
     pub engines: Mutex<Engines>,
     /// Detector is paused (user toggle or while recording).
     pub detection_paused: AtomicBool,
@@ -73,6 +75,7 @@ impl AppState {
             downloads: Mutex::new(HashMap::new()),
             chat_cancels: Mutex::new(HashMap::new()),
             rename_seq: Mutex::new(HashMap::new()),
+            live_feed: Mutex::new(None),
             share_server: Mutex::new(None),
             calendar: RwLock::new(Vec::new()),
             calendar_errors: RwLock::new(Vec::new()),

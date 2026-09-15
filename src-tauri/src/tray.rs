@@ -49,12 +49,16 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 }
 
 pub fn toggle_recording(app: &AppHandle) {
-    let is_recording = app.state::<AppState>().recording.lock().is_some();
-    let result = if is_recording { recorder::stop(app).map(|_| ()) } else { recorder::start(app, StartOptions::default()).map(|_| ()) };
-    if let Err(e) = result {
-        recorder::notice(app, "error", e);
-    }
-    refresh(app);
+    // Off the main thread: device setup/teardown must never block the event loop.
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let is_recording = app.state::<AppState>().recording.lock().is_some();
+        let result = if is_recording { recorder::stop(&app).map(|_| ()) } else { recorder::start(&app, StartOptions::default()).map(|_| ()) };
+        if let Err(e) = result {
+            recorder::notice(&app, "error", e);
+        }
+        refresh(&app);
+    });
 }
 
 /// Update the tray "Start/Stop recording" label after state changes.

@@ -7,7 +7,7 @@ use crate::wav::WavWriter;
 use crossbeam_channel::Sender;
 use parking_lot::Mutex;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -15,6 +15,9 @@ use std::time::{Duration, Instant};
 pub const ARCHIVE_HZ: u32 = 48_000;
 pub const ASR_HZ: u32 = 16_000;
 const TICK: Duration = Duration::from_millis(100);
+/// No microphone callback for this long while unpaused means the stream died
+/// (a device switch or unplug); the mic always delivers, even silence.
+const STALL_AFTER: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone)]
 pub struct RecordConfig {
@@ -34,6 +37,9 @@ pub enum CaptureEvent {
     Warning(String),
     /// Fatal stream error; the recorder keeps running but data may be missing.
     Error(String),
+    /// A stream stopped delivering audio (device switched or unplugged). The
+    /// owner should call [`Recorder::reopen`]; the recorder itself keeps going.
+    Stalled { mic: bool, sys: bool },
 }
 
 #[derive(Debug, Clone)]
@@ -61,12 +67,26 @@ struct Shared {
     sys_buf: Mutex<Vec<f32>>,
     paused: AtomicBool,
     stop: AtomicBool,
+    /// Millisecond timestamps (since `epoch`) of the last mic / system callback.
+    mic_seen_ms: AtomicU64,
+    sys_seen_ms: AtomicU64,
+    /// Set by a stream error callback; cleared by `reopen`.
+    stream_failed: AtomicBool,
+    epoch: Instant,
+}
+
+impl Shared {
+    fn now_ms(&self) -> u64 {
+        self.epoch.elapsed().as_millis() as u64
+    }
 }
 
 pub struct Recorder {
     shared: Arc<Shared>,
-    _mic: InputStream,
-    _sys: Option<InputStream>,
+    cfg: RecordConfig,
+    on_error: crate::stream::ErrorSink,
+    mic: Option<InputStream>,
+    sys: Option<InputStream>,
     worker: Option<JoinHandle<Result<Duration, RecordError>>>,
     started: Instant,
     paused_total: Arc<Mutex<Duration>>,
@@ -82,51 +102,23 @@ impl Recorder {
             sys_buf: Mutex::new(Vec::with_capacity(48_000)),
             paused: AtomicBool::new(false),
             stop: AtomicBool::new(false),
+            mic_seen_ms: AtomicU64::new(0),
+            sys_seen_ms: AtomicU64::new(0),
+            stream_failed: AtomicBool::new(false),
+            epoch: Instant::now(),
         });
 
         let err_tx = tx.clone();
+        let err_shared = shared.clone();
         let on_error: crate::stream::ErrorSink = Arc::new(move |e| {
+            err_shared.stream_failed.store(true, Ordering::SeqCst);
             let _ = err_tx.send(CaptureEvent::Error(e));
         });
 
         // Microphone (required).
-        let mic_dev = find_device(cfg.mic_device.as_deref(), false).ok_or(RecordError::NoMic)?;
-        let mic_shared = shared.clone();
-        let mic = open_input(
-            &mic_dev,
-            false,
-            Arc::new(move |pcm| mic_shared.mic_buf.lock().extend_from_slice(pcm)),
-            on_error.clone(),
-        )?;
-
+        let mic = open_mic(&cfg, &shared, &on_error)?;
         // System audio (optional).
-        let sys = if cfg.capture_system {
-            match find_device(cfg.loopback_device.as_deref(), true) {
-                Some(dev) => {
-                    let sys_shared = shared.clone();
-                    match open_input(
-                        &dev,
-                        true,
-                        Arc::new(move |pcm| sys_shared.sys_buf.lock().extend_from_slice(pcm)),
-                        on_error.clone(),
-                    ) {
-                        Ok(s) => Some(s),
-                        Err(e) => {
-                            let _ = tx.send(CaptureEvent::Warning(format!(
-                                "System audio unavailable ({e}); recording microphone only."
-                            )));
-                            None
-                        }
-                    }
-                }
-                None => {
-                    let _ = tx.send(CaptureEvent::Warning("No output device for system audio; mic only.".into()));
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        let sys = open_sys(&cfg, &shared, &on_error, &tx);
 
         let mic_wav = cfg.dir.join("mic.wav");
         let sys_wav = sys.as_ref().map(|_| cfg.dir.join("sys.wav"));
@@ -135,18 +127,19 @@ impl Recorder {
 
         let worker = {
             let shared = shared.clone();
-            let mic_hz = mic.sample_rate;
-            let sys_hz = sys.as_ref().map(|s| s.sample_rate);
+            let has_sys = sys.is_some();
             let tx = tx.clone();
             std::thread::Builder::new().name("hark-capture".into()).spawn(move || {
-                run_worker(shared, tx, mic_hz, sys_hz, mic_wav, sys_wav, mix_wav)
+                run_worker(shared, tx, has_sys, mic_wav, sys_wav, mix_wav)
             })?
         };
 
         Ok(Recorder {
             shared,
-            _mic: mic,
-            _sys: sys,
+            cfg,
+            on_error,
+            mic: Some(mic),
+            sys,
             worker: Some(worker),
             started: Instant::now(),
             paused_total: Arc::new(Mutex::new(Duration::ZERO)),
@@ -179,6 +172,35 @@ impl Recorder {
         self.started.elapsed().saturating_sub(paused)
     }
 
+    /// Rebuild the audio streams on the current devices after a stall or
+    /// error (the user switched or unplugged a device). Dead streams are
+    /// disposed without blocking; the worker keeps its writers, so the
+    /// archive files simply continue.
+    pub fn reopen(&mut self) -> Result<(), RecordError> {
+        if let Some(old) = self.mic.take() {
+            old.dispose();
+        }
+        if let Some(old) = self.sys.take() {
+            old.dispose();
+        }
+        // Whatever the dead streams left behind is stale.
+        self.shared.mic_buf.lock().clear();
+        self.shared.sys_buf.lock().clear();
+        self.shared.stream_failed.store(false, Ordering::SeqCst);
+        let (tx, _rx) = crossbeam_channel::bounded::<CaptureEvent>(4);
+        self.mic = Some(open_mic(&self.cfg, &self.shared, &self.on_error)?);
+        self.sys = open_sys(&self.cfg, &self.shared, &self.on_error, &tx);
+        let now = self.shared.now_ms();
+        self.shared.mic_seen_ms.store(now, Ordering::SeqCst);
+        self.shared.sys_seen_ms.store(now, Ordering::SeqCst);
+        Ok(())
+    }
+
+    /// True when a stream reported a fatal error since the last `reopen`.
+    pub fn stream_failed(&self) -> bool {
+        self.shared.stream_failed.load(Ordering::SeqCst)
+    }
+
     pub fn stop(mut self) -> Result<RecordOutput, RecordError> {
         self.resume();
         self.shared.stop.store(true, Ordering::SeqCst);
@@ -186,9 +208,59 @@ impl Recorder {
             Some(h) => h.join().map_err(|_| RecordError::Io(std::io::Error::other("capture thread panicked")))??,
             None => Duration::ZERO,
         };
+        // Streams are disposed off-thread (see `InputStream::dispose`) so a dead
+        // device can never hang the stop.
+        if let Some(m) = self.mic.take() {
+            m.dispose();
+        }
+        if let Some(s) = self.sys.take() {
+            s.dispose();
+        }
         let mut out = self.out.clone();
         out.duration = duration;
         Ok(out)
+    }
+}
+
+fn open_mic(cfg: &RecordConfig, shared: &Arc<Shared>, on_error: &crate::stream::ErrorSink) -> Result<InputStream, RecordError> {
+    let mic_dev = find_device(cfg.mic_device.as_deref(), false).ok_or(RecordError::NoMic)?;
+    let mic_shared = shared.clone();
+    Ok(open_input(
+        &mic_dev,
+        false,
+        ARCHIVE_HZ,
+        Arc::new(move |pcm| {
+            mic_shared.mic_seen_ms.store(mic_shared.now_ms(), Ordering::Relaxed);
+            mic_shared.mic_buf.lock().extend_from_slice(pcm)
+        }),
+        on_error.clone(),
+    )?)
+}
+
+fn open_sys(cfg: &RecordConfig, shared: &Arc<Shared>, on_error: &crate::stream::ErrorSink, tx: &Sender<CaptureEvent>) -> Option<InputStream> {
+    if !cfg.capture_system {
+        return None;
+    }
+    let Some(dev) = find_device(cfg.loopback_device.as_deref(), true) else {
+        let _ = tx.send(CaptureEvent::Warning("No output device for system audio; mic only.".into()));
+        return None;
+    };
+    let sys_shared = shared.clone();
+    match open_input(
+        &dev,
+        true,
+        ARCHIVE_HZ,
+        Arc::new(move |pcm| {
+            sys_shared.sys_seen_ms.store(sys_shared.now_ms(), Ordering::Relaxed);
+            sys_shared.sys_buf.lock().extend_from_slice(pcm)
+        }),
+        on_error.clone(),
+    ) {
+        Ok(s) => Some(s),
+        Err(e) => {
+            let _ = tx.send(CaptureEvent::Warning(format!("System audio unavailable ({e}); recording microphone only.")));
+            None
+        }
     }
 }
 
@@ -196,8 +268,7 @@ impl Recorder {
 fn run_worker(
     shared: Arc<Shared>,
     tx: Sender<CaptureEvent>,
-    mic_hz: u32,
-    sys_hz: Option<u32>,
+    has_sys: bool,
     mic_wav: PathBuf,
     sys_wav: Option<PathBuf>,
     mix_wav: PathBuf,
@@ -208,33 +279,42 @@ fn run_worker(
         None => None,
     };
     let mut mix_w = WavWriter::create(&mix_wav, ARCHIVE_HZ, 1)?;
-
-    let mut mic_to48 = Resampler::new(mic_hz, ARCHIVE_HZ);
-    let mut mic_to16 = Resampler::new(mic_hz, ASR_HZ);
-    let mut sys_to48 = sys_hz.map(|hz| Resampler::new(hz, ARCHIVE_HZ));
-    let mut sys_to16 = sys_hz.map(|hz| Resampler::new(hz, ASR_HZ));
+    // Streams already deliver ARCHIVE_HZ; only the live feed needs another rate.
+    let mut to16 = Resampler::new(ARCHIVE_HZ, ASR_HZ);
 
     let mut written_frames: u64 = 0;
+    let mut last_stall_report: Option<Instant> = None;
     loop {
         std::thread::sleep(TICK);
         let stopping = shared.stop.load(Ordering::SeqCst);
-        let mic_raw: Vec<f32> = std::mem::take(&mut *shared.mic_buf.lock());
-        let sys_raw: Vec<f32> = std::mem::take(&mut *shared.sys_buf.lock());
+        let mic48: Vec<f32> = std::mem::take(&mut *shared.mic_buf.lock());
+        let sys48: Vec<f32> = std::mem::take(&mut *shared.sys_buf.lock());
 
         if shared.paused.load(Ordering::SeqCst) && !stopping {
             let _ = tx.send(CaptureEvent::Levels { mic_db: -100.0, sys_db: -100.0 });
             continue;
         }
 
-        let mic_db = rms_db(&mic_raw);
-        let sys_db = if sys_hz.is_some() { rms_db(&sys_raw) } else { -100.0 };
+        // Stall watch: the mic callback went quiet, or a stream reported an
+        // error. Reported at most every 5 s until `reopen` clears it.
+        let now_ms = shared.now_ms();
+        let stall_ms = STALL_AFTER.as_millis() as u64;
+        let mic_stalled = now_ms.saturating_sub(shared.mic_seen_ms.load(Ordering::Relaxed)) > stall_ms;
+        let failed = shared.stream_failed.load(Ordering::SeqCst);
+        if (mic_stalled || failed) && !stopping {
+            if last_stall_report.map(|t| t.elapsed() >= Duration::from_secs(5)).unwrap_or(true) {
+                last_stall_report = Some(Instant::now());
+                let sys_stalled = has_sys && now_ms.saturating_sub(shared.sys_seen_ms.load(Ordering::Relaxed)) > stall_ms;
+                let _ = tx.send(CaptureEvent::Stalled { mic: mic_stalled || failed, sys: sys_stalled || failed });
+            }
+        } else {
+            last_stall_report = None;
+        }
+
+        let mic_db = rms_db(&mic48);
+        let sys_db = if has_sys { rms_db(&sys48) } else { -100.0 };
         let _ = tx.send(CaptureEvent::Levels { mic_db, sys_db });
 
-        let mic48 = mic_to48.process(&mic_raw);
-        let sys48 = match sys_to48.as_mut() {
-            Some(r) => r.process(&sys_raw),
-            None => Vec::new(),
-        };
         mic_w.write(&mic48)?;
         if let Some(w) = sys_w.as_mut() {
             w.write(&sys48)?;
@@ -245,12 +325,7 @@ fn run_worker(
         written_frames += mixed48.len() as u64;
         mix_w.write(&mixed48)?;
 
-        let mic16 = mic_to16.process(&mic_raw);
-        let sys16 = match sys_to16.as_mut() {
-            Some(r) => r.process(&sys_raw),
-            None => Vec::new(),
-        };
-        let mixed16 = mix(&mic16, &sys16, 1.0, 1.0);
+        let mixed16 = to16.process(&mixed48);
         if !mixed16.is_empty() {
             let _ = tx.send(CaptureEvent::Pcm16k(mixed16));
         }

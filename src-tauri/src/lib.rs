@@ -7,6 +7,7 @@ mod pipeline;
 mod recorder;
 mod settings;
 mod shortcuts;
+mod import;
 mod smoke;
 mod state;
 mod summary_stage;
@@ -97,6 +98,7 @@ pub fn run() {
             commands::meetings::refresh_calendar,
             commands::meetings::rediarize,
             commands::meetings::reembed,
+            commands::meetings::import_recording,
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::pause_recording,
@@ -126,6 +128,7 @@ pub fn run() {
             commands::ai::delete_template,
             commands::ai::get_summary,
             commands::ai::generate_summary,
+            commands::ai::draft_followup,
             commands::ai::list_chats,
             commands::ai::create_chat,
             commands::ai::delete_chat,
@@ -150,6 +153,7 @@ pub fn run() {
             commands::organize::export_meetings,
             commands::organize::import_meetings,
             commands::organize::export_html,
+            commands::organize::save_text_file,
             commands::organize::change_data_dir,
             commands::devices::list_audio_devices,
             commands::devices::list_video_sources,

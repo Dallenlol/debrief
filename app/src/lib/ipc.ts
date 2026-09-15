@@ -270,6 +270,8 @@ export const cmd = {
   retranscribe: (id: string, model?: string | null) => invoke<void>("retranscribe", { id, model: model ?? null }),
   rediarize: (id: string) => invoke<void>("rediarize", { id }),
   reembed: (id: string) => invoke<void>("reembed", { id }),
+  importRecording: (path: string, title?: string) => invoke<Meeting>("import_recording", { path, title: title ?? null }),
+  saveTextFile: (path: string, text: string) => invoke<void>("save_text_file", { path, text }),
 
   startRecording: (opts?: StartOptions) => invoke<Meeting>("start_recording", { opts }),
   stopRecording: () => invoke<Meeting>("stop_recording"),
@@ -305,6 +307,7 @@ export const cmd = {
   deleteTemplate: (id: string) => invoke<void>("delete_template", { id }),
   getSummary: (id: string) => invoke<Summary | null>("get_summary", { id }),
   generateSummary: (id: string, templateId?: string) => invoke<void>("generate_summary", { id, templateId }),
+  draftFollowup: (id: string) => invoke<string>("draft_followup", { id }),
   listChats: (scopeKind: "meeting" | "all", scopeId: string | null) => invoke<Chat[]>("list_chats", { scopeKind, scopeId }),
   createChat: (scopeKind: "meeting" | "all", scopeId: string | null, title?: string) => invoke<Chat>("create_chat", { scopeKind, scopeId, title }),
   deleteChat: (id: string) => invoke<void>("delete_chat", { id }),

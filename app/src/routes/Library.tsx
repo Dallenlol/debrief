@@ -1,4 +1,5 @@
-import { CalendarDays, Circle, Search, Video } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { CalendarDays, Circle, FileAudio, Search, Video } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { EmptyState } from "@/components/EmptyState";
@@ -8,6 +9,7 @@ import { appLabel, fmtDate, fmtDuration, fmtTime } from "@/lib/format";
 import { cmd, subscribe, type CalEvent, type Folder, type Meeting, type SearchHit, type Tag } from "@/lib/ipc";
 
 const STATUS_TONE = { recording: "ember", processing: "amber", ready: "moss", failed: "ember" } as const;
+const IMPORT_EXTENSIONS = ["mp3", "m4a", "aac", "wav", "flac", "ogg", "opus", "wma", "aiff", "amr", "mp4", "mov", "mkv", "webm", "avi", "m4v"];
 
 export function Library() {
   const [meetings, setMeetings] = useState<Meeting[] | null>(null);
@@ -17,7 +19,29 @@ export function Library() {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [upcoming, setUpcoming] = useState<CalEvent[]>([]);
+  const [importing, setImporting] = useState(false);
   const navigate = useNavigate();
+
+  // Pick audio/video files and turn each into a meeting; the pipeline runs in the background.
+  const importFiles = async () => {
+    const picked = await open({ multiple: true, title: "Import a recording", filters: [{ name: "Audio and video", extensions: IMPORT_EXTENSIONS }] });
+    const paths = (Array.isArray(picked) ? picked : picked ? [picked] : []) as string[];
+    if (paths.length === 0) return;
+    setImporting(true);
+    const failed: string[] = [];
+    let last: string | null = null;
+    for (const p of paths) {
+      try {
+        last = (await cmd.importRecording(p)).id;
+      } catch (e) {
+        failed.push(`${p.split(/[\\/]/).pop()}: ${String(e)}`);
+      }
+    }
+    setImporting(false);
+    reload();
+    if (failed.length > 0) alert(`Could not import:\n${failed.join("\n")}`);
+    if (paths.length === 1 && last) navigate(`/meeting/${last}`);
+  };
 
   useEffect(() => {
     const load = () => void cmd.listUpcoming(12).then(setUpcoming).catch(() => setUpcoming([]));
@@ -84,9 +108,14 @@ export function Library() {
               {meetings ? `${meetings.length} recording${meetings.length === 1 ? "" : "s"}, all on this computer.` : "Loading..."}
             </p>
           </div>
-          <div className="relative w-72">
-            <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
-            <Input placeholder="Search transcripts and titles" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void importFiles()} disabled={importing} title="Transcribe an audio or video file you already have">
+              <FileAudio size={14} /> {importing ? "Importing..." : "Import"}
+            </Button>
+            <div className="relative w-72">
+              <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+              <Input placeholder="Search transcripts and titles" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" />
+            </div>
           </div>
         </header>
 
@@ -134,8 +163,8 @@ export function Library() {
           selection.kind === "all" ? (
             <EmptyState
               title="Nothing recorded yet."
-              body="Hark will offer to record when it notices a call. Or start one yourself."
-              action={<Button variant="primary" onClick={() => void cmd.startRecording()}>Record now</Button>}
+              body="Hark will offer to record when it notices a call. Or start one yourself, or import a recording you already have."
+              action={<div className="flex items-center gap-2"><Button variant="primary" onClick={() => void cmd.startRecording()}>Record now</Button><Button variant="outline" onClick={() => void importFiles()}><FileAudio size={14} /> Import a file</Button></div>}
             />
           ) : (
             <EmptyState title="Nothing here." body="Drag meetings from the list onto a folder, or tag them from the meeting page." />

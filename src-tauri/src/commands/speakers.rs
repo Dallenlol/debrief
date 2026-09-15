@@ -18,7 +18,8 @@ pub fn meeting_speakers(state: State<AppState>, id: String) -> CmdResult<Vec<Mee
 /// Rename a label ("Speaker 2") to a person's name everywhere in this meeting.
 /// The voiceprint is stored so future meetings can suggest the name.
 #[tauri::command]
-pub fn rename_speaker(state: State<AppState>, id: String, label: String, name: String) -> CmdResult<Speaker> {
+pub fn rename_speaker(app: AppHandle, id: String, label: String, name: String) -> CmdResult<Speaker> {
+    let state = app.state::<AppState>();
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("name cannot be empty".into());
@@ -32,16 +33,24 @@ pub fn rename_speaker(state: State<AppState>, id: String, label: String, name: S
         map.insert(speaker.name.clone(), e);
         let _ = state.store.set_setting(&format!("speaker_embeddings:{id}"), &map);
     }
+    // Retrieval chunks bake the speaker label into their text; rebuild them (and
+    // their embeddings) so Ask Hark knows who the renamed voice is.
+    let app2 = app.clone();
+    std::thread::spawn(move || {
+        if let Err(e) = pipeline::reembed(&app2, &id) {
+            log::warn!("reembed after rename failed: {e}");
+        }
+    });
     Ok(speaker)
 }
 
 /// Accept the "Is this Sarah?" suggestion for a label.
 #[tauri::command]
-pub fn accept_speaker_suggestion(state: State<AppState>, id: String, label: String) -> CmdResult<Speaker> {
-    let rows = state.store.meeting_speakers(&id).map_err(err)?;
+pub fn accept_speaker_suggestion(app: AppHandle, id: String, label: String) -> CmdResult<Speaker> {
+    let rows = app.state::<AppState>().store.meeting_speakers(&id).map_err(err)?;
     let row = rows.into_iter().find(|r| r.label == label).ok_or("unknown speaker label")?;
     let name = row.suggested_name.ok_or("no suggestion for this speaker")?;
-    rename_speaker(state, id, label, name)
+    rename_speaker(app, id, label, name)
 }
 
 #[tauri::command]

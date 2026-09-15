@@ -73,6 +73,14 @@ pub fn retranscribe(app: AppHandle, id: String, model: Option<String>) -> CmdRes
     recorder::retranscribe(&app, &id, model)
 }
 
+/// Import an audio/video file as a new meeting and process it like a recording.
+#[tauri::command]
+pub async fn import_recording(app: AppHandle, path: String, title: Option<String>) -> CmdResult<Meeting> {
+    tauri::async_runtime::spawn_blocking(move || crate::import::import(&app, std::path::Path::new(&path), title.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Calendar events from 10 minutes ago to `hours` ahead (default 12).
 #[tauri::command]
 pub fn list_upcoming(state: State<AppState>, hours: Option<i64>) -> Vec<hark_calendar::CalEvent> {

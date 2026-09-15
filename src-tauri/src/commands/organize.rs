@@ -198,6 +198,16 @@ pub fn import_meetings(state: State<AppState>, path: String) -> CmdResult<Import
 }
 
 /// Write a standalone HTML page next to a copy of the media.
+/// Write text the UI rendered (transcript .txt/.md/.srt, summary) to a path the user picked.
+#[tauri::command]
+pub fn save_text_file(path: String, text: String) -> CmdResult<()> {
+    let p = PathBuf::from(&path);
+    if p.file_name().is_none() {
+        return Err("no file name".into());
+    }
+    std::fs::write(&p, text).map_err(|e| format!("could not write {}: {e}", p.display()))
+}
+
 #[tauri::command]
 pub fn export_html(state: State<AppState>, id: String, out_dir: String) -> CmdResult<String> {
     let meeting = state.store.get_meeting(&id).map_err(err)?.ok_or("meeting not found")?;

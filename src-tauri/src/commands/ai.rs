@@ -61,6 +61,50 @@ pub fn generate_summary(app: AppHandle, id: String, template_id: Option<String>)
     Ok(())
 }
 
+/// Draft a follow-up email from the summary (or the transcript when there is none).
+#[tauri::command]
+pub async fn draft_followup(app: AppHandle, id: String) -> CmdResult<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let backend = state.llm().ok_or("No language model available. Download one in Settings or connect an endpoint.")?;
+        let meeting = state.store.get_meeting(&id).map_err(err)?.ok_or("meeting not found")?;
+        let settings = state.settings.read().clone();
+        let segs = state.store.segments(&id).map_err(err)?;
+        let mut participants = meeting.participants.clone();
+        for sp in segs.iter().filter_map(|s| s.speaker.as_ref()) {
+            if !participants.contains(sp) {
+                participants.push(sp.clone());
+            }
+        }
+        let summary = state.store.get_summary(&id).map_err(err)?;
+        let (notes, notes_are_transcript) = match summary {
+            Some(s) if !s.markdown.trim().is_empty() => (s.markdown, false),
+            _ => {
+                let t = segs
+                    .iter()
+                    .map(|s| hark_llm::summary::transcript_line(s.start_ms, s.speaker.as_deref(), s.clean_text.as_deref().unwrap_or(&s.text)))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                (t.chars().take(hark_llm::followup::TRANSCRIPT_FALLBACK_CHARS).collect(), true)
+            }
+        };
+        if notes.trim().is_empty() {
+            return Err("Nothing to write from yet: the meeting has no transcript.".into());
+        }
+        let input = hark_llm::followup::FollowupInput {
+            title: &meeting.title,
+            date: &meeting.started_at.with_timezone(&chrono::Local).format("%b %-d, %Y").to_string(),
+            participants: &if participants.is_empty() { "unknown".to_string() } else { participants.join(", ") },
+            notes: &notes,
+            notes_are_transcript,
+            sender: &settings.user_name,
+        };
+        hark_llm::followup::generate(backend.as_ref(), &input).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // ---- chat ----
 
 #[tauri::command]

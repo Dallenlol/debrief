@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 - 2026-09-15
+
+- **Import a recording.** Library > Import (or drop in the empty state): any audio or video file - a phone voice memo, an old Zoom .mp4 - becomes a meeting and goes through transcription, speakers, clean-up, summary and search indexing. The file's date becomes the meeting date; video is kept when the player can show it.
+- **Follow-up email.** Summary tab > Follow-up email drafts a short recap with decisions and owned action items from the notes (local model), in an editable box with Copy.
+- **Export.** Copy the transcript or summary; save the transcript as .txt, .srt subtitles, or notes + transcript as .md.
+- **Talk time.** A bar under the title shows who spoke how much; it follows the names you assign.
+- **Fix: renamed speakers now reach Ask Hark.** Naming "Speaker 2" as Sarah rebuilds the search index, so "what did Sarah agree to?" finds her lines. Previously chat kept seeing the old label.
+- Build: the workspace test run no longer breaks when the sherpa-onnx download cache is gone.
+
 ## 0.2.0 - 2026-09-14
 
 - **Long meetings summarise fully.** Transcripts beyond ~25 minutes are condensed part by part before the template runs, instead of dropping the middle.

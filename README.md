@@ -15,6 +15,8 @@ Hark notices when you're in a call, offers a **Record** button (it never records
 - **Transcribes** with live captions during the call and a full pass after, with **speaker labels**, in English or 30 other languages. Name a speaker once; Hark recognises their voice next time and asks you to confirm. Attendee names from the meeting window or your calendar are offered as you type.
 - **Cleans up** messy transcripts with a local language model: bad mics, broken English, filler. The raw transcript is always kept.
 - **Summarises** instantly from editable templates (general, sales call, client discovery, 1:1, standup, interview), condensing long meetings part by part so nothing is dropped. Titles itself from the content.
+- **Imports files** you already have - a phone voice memo, an old Zoom .mp4 - and treats them like a recording.
+- **Drafts the follow-up email** from the notes, and exports transcripts as .txt / .srt / .md. Shows who spoke how much.
 - **Answers questions** ("Ask Hark") about one meeting or your whole library with hybrid keyword + semantic search, citing timestamps you can click.
 - **Organises** with folders, tags, search, highlights and clips.
 - **Shares** via links on your network, `.hark` bundles you can import on another computer, or a standalone web page. An opt-in webhook pushes finished meetings to Zapier, n8n, Make or your own script.
@@ -29,7 +31,7 @@ Grab an installer from [Releases](https://github.com/Dallenlol/hark/releases): W
 
 ## Status
 
-**0.2.0** - second public build. See [CHANGELOG.md](CHANGELOG.md).
+**0.3.0** - third public build. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Principles
 

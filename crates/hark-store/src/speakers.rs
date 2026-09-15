@@ -172,6 +172,21 @@ mod tests {
     }
 
     #[test]
+    fn rebuilt_chunks_carry_the_new_name() {
+        let st = Store::open_in_memory().unwrap();
+        let m = Meeting::new_recording("m", None);
+        st.create_meeting(&m).unwrap();
+        st.replace_segments(&m.id, &[seg(0, "Speaker 1", "we ship friday"), seg(1000, "Speaker 2", "agreed")]).unwrap();
+        st.rebuild_chunks(&m.id).unwrap();
+        assert!(st.chunks(&m.id).unwrap()[0].text.contains("Speaker 1: we ship friday"));
+        st.rename_speaker(&m.id, "Speaker 1", "Sarah", None).unwrap();
+        st.rebuild_chunks(&m.id).unwrap();
+        let text = &st.chunks(&m.id).unwrap()[0].text;
+        assert!(text.contains("Sarah: we ship friday"), "{text}");
+        assert!(!text.contains("Speaker 1"));
+    }
+
+    #[test]
     fn rename_applies_to_all_segments_and_creates_speaker() {
         let st = Store::open_in_memory().unwrap();
         let m = Meeting::new_recording("m", None);

@@ -2,6 +2,10 @@
 
 ## 0.3.0 - 2026-09-15
 
+- **Pick what to record, every time.** Record now, the hotkey, the tray and the call popup all open the same picker: choose the meeting window (or a display), and on Windows Hark captures **only that app's audio** plus your mic - music, notifications and other calls stay out. "Everything playing" is one click away.
+- **Live transcript and live notes.** Open the recording from the Library while it runs: captions land as people talk (the current line refines in place), and running notes - what's being discussed, decisions and action items so far - update about a minute after new lines arrive, at most every two minutes.
+- **Live captions you can read.** The live pass now transcribes whole utterances (refined every 2 s, committed on a pause), carries the previous text as context so names stay consistent, never transcribes silence (which whisper turned into invented sentences), drops "thanks for watching"-style hallucinations, and locks the language after the first detection.
+- **Recordings survive device changes.** When Windows invalidates the audio device mid-call (headset unplugged, output switched, the call app releasing the device), Hark reopens the current devices and keeps going; a dead stream can no longer hang Stop or freeze the window. Recordings left in "recording" by a crash or hang are finished automatically on the next launch from the audio on disk.
 - **Import a recording.** Library > Import (or drop in the empty state): any audio or video file - a phone voice memo, an old Zoom .mp4 - becomes a meeting and goes through transcription, speakers, clean-up, summary and search indexing. The file's date becomes the meeting date; video is kept when the player can show it.
 - **Follow-up email.** Summary tab > Follow-up email drafts a short recap with decisions and owned action items from the notes (local model), in an editable box with Copy.
 - **Export.** Copy the transcript or summary; save the transcript as .txt, .srt subtitles, or notes + transcript as .md.

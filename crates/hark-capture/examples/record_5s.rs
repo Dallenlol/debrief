@@ -8,7 +8,7 @@ fn main() {
     println!("inputs:  {:?}", hark_capture::input_devices().iter().map(|d| &d.name).collect::<Vec<_>>());
     println!("outputs: {:?}", hark_capture::output_devices().iter().map(|d| &d.name).collect::<Vec<_>>());
     let rec = Recorder::start(
-        RecordConfig { dir: dir.clone(), mic_device: None, loopback_device: None, capture_system: true },
+        RecordConfig { dir: dir.clone(), mic_device: None, loopback_device: None, capture_system: true, audio_pid: None },
         tx,
     )
     .expect("start");

@@ -24,7 +24,7 @@ fn smoke(app: &AppHandle) -> Result<(), String> {
     std::thread::sleep(Duration::from_secs(2));
     let video = std::env::var("HARK_SMOKE_VIDEO").map(|v| v == "1").unwrap_or(false);
     log::info!("SMOKE: calling recorder::start");
-    let m = recorder::start(app, StartOptions { title: Some("Smoke test".into()), app: None, video: Some(video), target: None })?;
+    let m = recorder::start(app, StartOptions { title: Some("Smoke test".into()), app: None, video: Some(video), target: None, audio_pid: None })?;
     println!("SMOKE recording {} (video={video})", m.id);
     std::thread::sleep(Duration::from_secs(8));
     let m = recorder::stop(app)?;

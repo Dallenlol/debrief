@@ -72,7 +72,7 @@ export function Shell() {
             ) : (
               <>
                 <div className="text-[12px] text-ink-2">Ready when you are.</div>
-                <Button variant="primary" size="sm" className="mt-2 w-full" onClick={() => void cmd.startRecording()}>
+                <Button variant="primary" size="sm" className="mt-2 w-full" onClick={() => void cmd.openRecordPicker()}>
                   <Circle size={12} className="text-ember" fill="currentColor" /> Record now
                 </Button>
                 <div className="mt-2 text-center text-[11px] text-ink-3">

@@ -114,6 +114,7 @@ pub fn run() {
             commands::recording::mark_highlight,
             commands::recording::recording_status,
             commands::recording::live_snapshot,
+            commands::recording::open_record_picker,
             commands::recording::dismiss_detection,
             commands::recording::open_main,
             commands::settings::get_settings,

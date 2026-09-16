@@ -1,4 +1,4 @@
-use crate::recorder::{self, StartOptions};
+use crate::recorder;
 use crate::state::AppState;
 use crate::windows;
 use std::sync::atomic::Ordering;
@@ -53,9 +53,13 @@ pub fn toggle_recording(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
         let is_recording = app.state::<AppState>().recording.lock().is_some();
-        let result = if is_recording { recorder::stop(&app).map(|_| ()) } else { recorder::start(&app, StartOptions::default()).map(|_| ()) };
-        if let Err(e) = result {
-            recorder::notice(&app, "error", e);
+        if is_recording {
+            if let Err(e) = recorder::stop(&app) {
+                recorder::notice(&app, "error", e);
+            }
+        } else {
+            // Never start blind: the picker chooses the window and its audio first.
+            recorder::open_picker(&app);
         }
         refresh(&app);
     });

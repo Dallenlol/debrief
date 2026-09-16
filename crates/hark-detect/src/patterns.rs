@@ -10,6 +10,9 @@ pub struct WindowInfo {
     /// Native window handle (Windows HWND); 0 when unknown.
     #[serde(default)]
     pub hwnd: isize,
+    /// Owning process id; 0 when unknown.
+    #[serde(default)]
+    pub pid: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,7 +149,7 @@ mod tests {
     use super::*;
 
     fn w(p: &str, t: &str) -> WindowInfo {
-        WindowInfo { process: p.into(), title: t.into(), hwnd: 0 }
+        WindowInfo { process: p.into(), title: t.into(), hwnd: 0, pid: 0 }
     }
 
     #[test]

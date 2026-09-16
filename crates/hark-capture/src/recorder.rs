@@ -25,6 +25,8 @@ pub struct RecordConfig {
     pub mic_device: Option<String>,
     pub loopback_device: Option<String>,
     pub capture_system: bool,
+    /// Capture system audio only from this process tree (Windows); `None` = everything.
+    pub audio_pid: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -111,8 +113,13 @@ impl Recorder {
         let err_tx = tx.clone();
         let err_shared = shared.clone();
         let on_error: crate::stream::ErrorSink = Arc::new(move |e| {
-            err_shared.stream_failed.store(true, Ordering::SeqCst);
-            let _ = err_tx.send(CaptureEvent::Error(e));
+            // Buffer over/underruns are dropped packets, not a dead stream.
+            if is_fatal_stream_error(&e) {
+                err_shared.stream_failed.store(true, Ordering::SeqCst);
+                let _ = err_tx.send(CaptureEvent::Error(e));
+            } else {
+                let _ = err_tx.send(CaptureEvent::Warning(e));
+            }
         });
 
         // Microphone (required).
@@ -222,6 +229,12 @@ impl Recorder {
     }
 }
 
+/// cpal funnels transient glitches through the same callback as device loss.
+pub fn is_fatal_stream_error(msg: &str) -> bool {
+    let m = msg.to_ascii_lowercase();
+    !(m.contains("underrun") || m.contains("overrun"))
+}
+
 fn open_mic(cfg: &RecordConfig, shared: &Arc<Shared>, on_error: &crate::stream::ErrorSink) -> Result<InputStream, RecordError> {
     let mic_dev = find_device(cfg.mic_device.as_deref(), false).ok_or(RecordError::NoMic)?;
     let mic_shared = shared.clone();
@@ -240,6 +253,24 @@ fn open_mic(cfg: &RecordConfig, shared: &Arc<Shared>, on_error: &crate::stream::
 fn open_sys(cfg: &RecordConfig, shared: &Arc<Shared>, on_error: &crate::stream::ErrorSink, tx: &Sender<CaptureEvent>) -> Option<InputStream> {
     if !cfg.capture_system {
         return None;
+    }
+    #[cfg(windows)]
+    if let Some(pid) = cfg.audio_pid {
+        let sys_shared = shared.clone();
+        match InputStream::process_loopback(
+            pid,
+            ARCHIVE_HZ,
+            Arc::new(move |pcm| {
+                sys_shared.sys_seen_ms.store(sys_shared.now_ms(), Ordering::Relaxed);
+                sys_shared.sys_buf.lock().extend_from_slice(pcm)
+            }),
+            on_error.clone(),
+        ) {
+            Ok(s) => return Some(s),
+            Err(e) => {
+                let _ = tx.send(CaptureEvent::Warning(format!("Could not capture that app's audio alone ({e}); recording all system audio instead.")));
+            }
+        }
     }
     let Some(dev) = find_device(cfg.loopback_device.as_deref(), true) else {
         let _ = tx.send(CaptureEvent::Warning("No output device for system audio; mic only.".into()));

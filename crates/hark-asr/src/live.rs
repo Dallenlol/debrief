@@ -154,7 +154,11 @@ fn run_pass(engine: &WhisperEngine, st: &mut LiveState, flush: bool, tx: &Sender
                     st.lang_locked = true;
                 }
             }
-            let caps: Vec<Caption> = t.captions.into_iter().filter(|c| !is_hallucination(&c.text)).collect();
+            let mut caps: Vec<Caption> = t.captions.into_iter().filter(|c| !is_hallucination(&c.text)).collect();
+            // With a prompt, whisper sometimes just repeats it when the audio is unclear.
+            if echoes_prompt(&caps, &st.prompt) {
+                caps.clear();
+            }
             let end_ms = offset_ms + (st.buf.len() as i64) * 1000 / HZ as i64;
             if commit {
                 for c in &caps {
@@ -176,6 +180,17 @@ fn run_pass(engine: &WhisperEngine, st: &mut LiveState, flush: bool, tx: &Sender
             Ok(())
         }
     }
+}
+
+/// True when the new text is nothing but the end of the prompt again.
+pub fn echoes_prompt(caps: &[Caption], prompt: &str) -> bool {
+    if caps.is_empty() || prompt.trim().is_empty() {
+        return false;
+    }
+    let norm = |s: &str| s.chars().filter(|c| c.is_alphanumeric() || c.is_whitespace()).collect::<String>().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
+    let text = norm(&caps.iter().map(|c| c.text.as_str()).collect::<Vec<_>>().join(" "));
+    let p = norm(prompt);
+    text.len() >= 12 && p.ends_with(&text)
 }
 
 fn rms_db(samples: &[f32]) -> f32 {
@@ -277,6 +292,14 @@ mod tests {
         assert!(is_hallucination("you you you you you"));
         assert!(!is_hallucination("Thank you for the update on the budget."));
         assert!(!is_hallucination("we ship on the ninth"));
+    }
+
+    #[test]
+    fn prompt_echo_is_dropped() {
+        let cap = |t: &str| Caption { start_ms: 0, end_ms: 1, text: t.into(), is_final: true };
+        assert!(echoes_prompt(&[cap("we ship on the ninth.")], "okay so we ship on the ninth"));
+        assert!(!echoes_prompt(&[cap("and the budget is fine")], "okay so we ship on the ninth"));
+        assert!(!echoes_prompt(&[cap("ok")], "ok"));
     }
 
     #[test]

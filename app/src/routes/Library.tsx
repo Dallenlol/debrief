@@ -132,7 +132,7 @@ export function Library() {
                     <span className="min-w-0 flex-1 truncate font-medium">{e.title}</span>
                     {e.attendees.length > 0 && <span className="hidden truncate text-[12px] text-ink-3 md:inline">{e.attendees.slice(0, 3).join(", ")}{e.attendees.length > 3 ? ` +${e.attendees.length - 3}` : ""}</span>}
                     {live ? (
-                      <Button variant="ember" size="sm" onClick={() => void cmd.startRecording({ title: e.title })}><Circle size={10} fill="currentColor" /> Record</Button>
+                      <Button variant="ember" size="sm" onClick={() => void cmd.openRecordPicker()}><Circle size={10} fill="currentColor" /> Record</Button>
                     ) : (
                       <span className="text-[12px] text-ink-3">in {Math.max(1, Math.round((start - Date.now()) / 60_000))} min</span>
                     )}
@@ -164,7 +164,7 @@ export function Library() {
             <EmptyState
               title="Nothing recorded yet."
               body="Hark will offer to record when it notices a call. Or start one yourself, or import a recording you already have."
-              action={<div className="flex items-center gap-2"><Button variant="primary" onClick={() => void cmd.startRecording()}>Record now</Button><Button variant="outline" onClick={() => void importFiles()}><FileAudio size={14} /> Import a file</Button></div>}
+              action={<div className="flex items-center gap-2"><Button variant="primary" onClick={() => void cmd.openRecordPicker()}>Record now</Button><Button variant="outline" onClick={() => void importFiles()}><FileAudio size={14} /> Import a file</Button></div>}
             />
           ) : (
             <EmptyState title="Nothing here." body="Drag meetings from the list onto a folder, or tag them from the meeting page." />

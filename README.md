@@ -11,7 +11,8 @@ Hark notices when you're in a call, offers a **Record** button (it never records
 ## What it does
 
 - **Notices calls** in Zoom, Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime, GoToMeeting, Whereby, Jitsi, Around, Skype, RingCentral, WhatsApp/Telegram/Signal calls - native or in a browser tab - and anything else via audio activity. Shows a small **Record?** popup with a screen picker; a global hotkey and tray menu work anytime.
-- **Records** your mic and system audio as separate tracks, plus optional screen video. Writes to disk continuously, so a crash loses seconds, not the meeting.
+- **Records** your mic and the meeting app's audio (Windows: just that app, so music and notifications from elsewhere stay out) as separate tracks, plus optional screen video. Asks which window to record first. Writes to disk continuously and finishes interrupted recordings on the next launch, so a crash loses seconds, not the meeting.
+- **Shows the meeting live**: open the recording while it runs for captions as they land and running notes that update every minute or two.
 - **Transcribes** with live captions during the call and a full pass after, with **speaker labels**, in English or 30 other languages. Name a speaker once; Hark recognises their voice next time and asks you to confirm. Attendee names from the meeting window or your calendar are offered as you type.
 - **Cleans up** messy transcripts with a local language model: bad mics, broken English, filler. The raw transcript is always kept.
 - **Summarises** instantly from editable templates (general, sales call, client discovery, 1:1, standup, interview), condensing long meetings part by part so nothing is dropped. Titles itself from the content.

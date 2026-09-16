@@ -10,30 +10,37 @@ export function Popup() {
   const [left, setLeft] = useState(30);
   const [sources, setSources] = useState<VideoSource[]>([]);
   const [target, setTarget] = useState<VideoTarget | null>(null);
+  // Audio: only the chosen window's app (Windows), or everything the computer plays.
+  const [appAudio, setAppAudio] = useState(true);
+  const manual = det?.app === "manual";
+  const isWindows = navigator.userAgent.includes("Windows");
 
   const keyOf = (t: VideoTarget) => (t.kind === "monitor" ? `m:${t.index}` : `w:${t.title}`);
+  const selected = sources.find((s) => target && keyOf(s.target) === keyOf(target)) ?? null;
+  const canAppAudio = isWindows && selected?.pid != null;
 
   useEffect(() => {
     void cmd.getSettings().then((s) => setVideo(s.video_enabled));
     return subscribe("detection", (d) => {
       setDet(d);
       setLeft(30);
-      void cmd.listVideoSources(d.app === "unknown" ? null : d.app).then((s) => {
+      void cmd.listVideoSources(d.app === "unknown" || d.app === "manual" ? null : d.app).then((s) => {
         setSources(s);
-        setTarget(s.find((x) => x.is_meeting)?.target ?? s[0]?.target ?? null);
+        // Prefer the meeting window, else the first window (so per-app audio works), else a display.
+        setTarget(s.find((x) => x.is_meeting)?.target ?? s.find((x) => x.target.kind === "window")?.target ?? s[0]?.target ?? null);
       });
     });
   }, []);
 
-  // Auto-hide countdown.
+  // Auto-hide countdown (detections only; a manual picker waits for you).
   useEffect(() => {
-    if (!det) return;
+    if (!det || manual) return;
     const t = setInterval(() => setLeft((n) => n - 1), 1000);
     return () => clearInterval(t);
-  }, [det]);
+  }, [det, manual]);
   useEffect(() => {
-    if (det && left <= 0) void cmd.dismissDetection(det.app, "now");
-  }, [left, det]);
+    if (det && !manual && left <= 0) void cmd.dismissDetection(det.app, "now");
+  }, [left, det, manual]);
 
   // Escape = "Not now"; Enter = Record.
   useEffect(() => {
@@ -49,7 +56,14 @@ export function Popup() {
 
   const record = async () => {
     if (!det) return;
-    await cmd.startRecording({ app: det.app === "unknown" ? undefined : det.app, video, target: video && target ? target : undefined });
+    const app = det.app === "unknown" || det.app === "manual" ? undefined : det.app;
+    // The picked window always drives the audio; video only when screen capture is on.
+    const audio_pid = canAppAudio && appAudio && selected?.pid != null ? selected.pid : undefined;
+    try {
+      await cmd.startRecording({ app, video, target: video && target ? target : undefined, audio_pid });
+    } catch (e) {
+      alert(String(e));
+    }
   };
 
   if (!det) return <div className="h-full" />;
@@ -59,8 +73,8 @@ export function Popup() {
       <div className="flex items-start justify-between gap-3" data-tauri-drag-region>
         <div className="min-w-0" data-tauri-drag-region>
           <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-            <span className="h-2 w-2 rounded-full bg-moss" />
-            {det.label} detected
+            <span className={`h-2 w-2 rounded-full ${manual ? "bg-ember" : "bg-moss"}`} />
+            {manual ? det.label : `${det.label} detected`}
           </div>
           {det.event && <div className="mt-0.5 truncate text-[12px] font-medium text-ink-2" title="From your calendar">{det.event}</div>}
           <div className="mt-0.5 truncate text-[12px] text-ink-3" title={det.title}>{det.title}</div>
@@ -75,9 +89,9 @@ export function Popup() {
           {video ? <Video size={12} /> : <VideoOff size={12} />} {video ? "Screen on" : "Audio only"}
         </button>
       </div>
-      {video && sources.length > 0 && (
+      {sources.length > 0 && (
         <label className="mt-2 flex items-center gap-2 text-[11px] text-ink-3">
-          <span className="shrink-0">Screen</span>
+          <span className="shrink-0">{video ? "Screen" : "Window"}</span>
           <select
             aria-label="Screen to record"
             value={target ? keyOf(target) : ""}
@@ -90,16 +104,28 @@ export function Popup() {
           </select>
         </label>
       )}
+      <div className="mt-1.5 flex items-center gap-3 text-[11px] text-ink-3" role="radiogroup" aria-label="Which audio to capture">
+        <span className="shrink-0">Audio</span>
+        <label className={`inline-flex items-center gap-1 ${canAppAudio ? "" : "opacity-50"}`} title={canAppAudio ? "Only what this app plays - no music or notifications from other apps" : isWindows ? "Pick a window to capture just that app" : "Per-app audio needs Windows; all system audio is recorded"}>
+          <input type="radio" name="audio" checked={canAppAudio && appAudio} disabled={!canAppAudio} onChange={() => setAppAudio(true)} /> This app only
+        </label>
+        <label className="inline-flex items-center gap-1">
+          <input type="radio" name="audio" checked={!canAppAudio || !appAudio} onChange={() => setAppAudio(false)} /> Everything playing
+        </label>
+        <span className="ml-auto">+ your mic</span>
+      </div>
       <div className="mt-auto flex items-center gap-2">
         <Button variant="ember" size="md" className="flex-1" onClick={() => void record()}>
           <Circle size={12} fill="currentColor" /> Record
         </Button>
         <Button variant="ghost" size="md" onClick={() => void cmd.dismissDetection(det.app, "now")}>
-          Not now <span className="ml-1 font-mono text-[11px] text-ink-3">{left}</span>
+          {manual ? "Cancel" : <>Not now <span className="ml-1 font-mono text-[11px] text-ink-3">{left}</span></>}
         </Button>
-        <Button variant="ghost" size="md" onClick={() => void cmd.dismissDetection(det.app, "never")} title="Stop asking for this app">
-          Never
-        </Button>
+        {!manual && (
+          <Button variant="ghost" size="md" onClick={() => void cmd.dismissDetection(det.app, "never")} title="Stop asking for this app">
+            Never
+          </Button>
+        )}
       </div>
     </div>
   );

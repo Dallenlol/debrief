@@ -8,6 +8,8 @@
 pub mod devices;
 pub mod dsp;
 pub mod probe;
+#[cfg(windows)]
+pub mod process_loopback;
 pub mod recorder;
 pub mod stream;
 pub mod monitors;

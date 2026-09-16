@@ -165,6 +165,7 @@ impl VideoRecorder {
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()?;
+        tie_to_process(&child);
         Ok(VideoRecorder { child, output: out.to_path_buf() })
     }
 
@@ -188,6 +189,32 @@ impl VideoRecorder {
         }
     }
 }
+
+/// Make the OS kill ffmpeg if Hark dies, so a crash never leaves a screen
+/// recorder running in the background. Windows job object; no-op elsewhere.
+#[cfg(windows)]
+fn tie_to_process(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    unsafe {
+        let Ok(job) = CreateJobObjectW(None, None) else { return };
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        let ok = SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info as *const _ as *const _, std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32).is_ok();
+        if ok {
+            let _ = AssignProcessToJobObject(job, HANDLE(child.as_raw_handle() as *mut _));
+        }
+        // fable: the job handle is deliberately leaked; it lives as long as this process,
+        // which is exactly the lifetime that should kill ffmpeg.
+    }
+}
+
+#[cfg(not(windows))]
+fn tie_to_process(_child: &Child) {}
 
 /// Run ffmpeg to completion with `args`; returns stderr on failure.
 pub fn run_ffmpeg(ffmpeg: &Path, args: &[String]) -> Result<(), String> {

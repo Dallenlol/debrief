@@ -50,7 +50,8 @@ parking_lot.workspace = true
 crossbeam-channel.workspace = true
 chrono.workspace = true
 log = "0.4"
-tracing = "0.1"
+# "log": crates that use tracing (hark-asr, hark-capture) surface in the app log.
+tracing = { version = "0.1", features = ["log"] }
 tracing-log = "0.2"
 hound = "3.5"
 uuid.workspace = true

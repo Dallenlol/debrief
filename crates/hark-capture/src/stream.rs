@@ -22,11 +22,20 @@ pub enum StreamError {
 
 /// A running input stream plus the format it delivers.
 pub struct InputStream {
-    stream: Option<Stream>,
+    inner: Inner,
     /// Native rate of the device (what cpal delivers before resampling).
     pub device_rate: u32,
     /// Rate `on_audio` receives.
     pub sample_rate: u32,
+}
+
+enum Inner {
+    Cpal(Option<Stream>),
+    /// Windows per-process loopback; stops itself on drop without blocking.
+    #[cfg(windows)]
+    Process(crate::process_loopback::ProcessLoopback),
+    #[allow(dead_code)]
+    Gone,
 }
 
 impl InputStream {
@@ -35,17 +44,29 @@ impl InputStream {
     /// the drop happens on a throwaway thread; elsewhere `cpal::Stream` is not
     /// `Send` and the drop is well behaved.
     pub fn dispose(mut self) {
-        if let Some(s) = self.stream.take() {
-            dispose_stream(s);
+        self.teardown();
+    }
+
+    fn teardown(&mut self) {
+        match std::mem::replace(&mut self.inner, Inner::Gone) {
+            Inner::Cpal(Some(s)) => dispose_stream(s),
+            #[cfg(windows)]
+            Inner::Process(p) => drop(p),
+            _ => {}
         }
+    }
+
+    /// Capture only what one process tree plays (Windows 10 2004+).
+    #[cfg(windows)]
+    pub fn process_loopback(pid: u32, target_hz: u32, on_audio: AudioSink, on_error: ErrorSink) -> Result<InputStream, StreamError> {
+        let p = crate::process_loopback::open_process_loopback(pid, target_hz, on_audio, on_error)?;
+        Ok(InputStream { inner: Inner::Process(p), device_rate: 48_000, sample_rate: target_hz })
     }
 }
 
 impl Drop for InputStream {
     fn drop(&mut self) {
-        if let Some(s) = self.stream.take() {
-            dispose_stream(s);
-        }
+        self.teardown();
     }
 }
 
@@ -113,5 +134,5 @@ pub fn open_input(
         other => return Err(StreamError::Cpal(format!("unsupported sample format {other:?}"))),
     };
     stream.play().map_err(|e| StreamError::Cpal(e.to_string()))?;
-    Ok(InputStream { stream: Some(stream), device_rate, sample_rate: target_hz })
+    Ok(InputStream { inner: Inner::Cpal(Some(stream)), device_rate, sample_rate: target_hz })
 }

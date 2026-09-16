@@ -16,3 +16,4 @@ site/dist/
 site/node_modules/
 .playwright-mcp/
 site/.astro/
+target-cuda/

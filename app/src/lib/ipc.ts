@@ -86,6 +86,8 @@ export type VideoTarget = { kind: "monitor"; index: number } | { kind: "window";
 export type Tier = "cpu_low" | "cpu_high" | "gpu";
 
 export interface VideoSource {
+  /** Owning process (window sources on Windows); lets the recorder capture only that app's audio. */
+  pid: number | null;
   target: VideoTarget;
   label: string;
   is_meeting: boolean;
@@ -255,6 +257,8 @@ export interface StartOptions {
   app?: string;
   video?: boolean;
   target?: VideoTarget;
+  /** Capture system audio only from this process tree. */
+  audio_pid?: number;
 }
 
 export const cmd = {
@@ -280,6 +284,7 @@ export const cmd = {
   markHighlight: () => invoke<number>("mark_highlight"),
   recordingStatus: () => invoke<RecordingState>("recording_status"),
   liveSnapshot: () => invoke<LiveSnapshot | null>("live_snapshot"),
+  openRecordPicker: () => invoke<void>("open_record_picker"),
   dismissDetection: (appId: string, mode: "now" | "never" | "snooze") =>
     invoke<void>("dismiss_detection", { appId, mode }),
   openMain: () => invoke<void>("open_main"),

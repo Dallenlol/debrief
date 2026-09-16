@@ -52,6 +52,7 @@ export function MeetingPage() {
   const [followup, setFollowup] = useState<string | null>(null);
   const [followupBusy, setFollowupBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
   const player = useRef<PlayerHandle>(null);
   const live = useLiveFeed(id, detail?.meeting.status === "recording");
 
@@ -84,9 +85,16 @@ export function MeetingPage() {
     if (p.meeting_id === id) setDetail((d) => (d ? { ...d, meeting: { ...d.meeting, participants: p.participants } } : d));
   }), [id]);
 
+  // Stop takes a few seconds (last captions, video trailer); the page says so until the status flips.
   useEffect(() => subscribe("recording_state", (s) => {
-    if (s.state === "idle") load();
+    if (s.state === "idle") {
+      setStopping(true);
+      load();
+    }
   }), [load]);
+  useEffect(() => {
+    if (detail && detail.meeting.status !== "recording") setStopping(false);
+  }, [detail]);
 
   useEffect(() => {
     load();
@@ -342,7 +350,11 @@ export function MeetingPage() {
             <div className="rounded-lg border border-line bg-canvas-2 p-5">
               <div className="inline-flex items-center gap-2 text-[13px] font-medium text-ember"><span className="h-2 w-2 animate-pulse rounded-full bg-ember" /> Recording in progress</div>
               <p className="mt-2 text-[13px] text-ink-2">Captions and notes update as people talk. The full transcript with speaker names, the summary and Ask Hark arrive once you stop.</p>
-              <Button variant="ember" size="sm" className="mt-4" onClick={() => void cmd.stopRecording().catch((e) => alert(String(e)))}>Stop recording</Button>
+              {stopping ? (
+                <div className="mt-4 inline-flex items-center gap-2 text-[13px] text-ink-2"><Spinner className="h-3.5 w-3.5" /> Finishing the recording...</div>
+              ) : (
+                <Button variant="ember" size="sm" className="mt-4" onClick={() => { setStopping(true); void cmd.stopRecording().catch((e) => { setStopping(false); alert(String(e)); }); }}>Stop recording</Button>
+              )}
             </div>
           ) : (
             <Player ref={player} audio={detail.media.audio} video={detail.media.video} highlights={detail.highlights} onTime={onTime} />

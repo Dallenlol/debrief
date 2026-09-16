@@ -52,6 +52,12 @@ pub fn recording_status(app: AppHandle) -> RecordingStatePayload {
     recorder::status_payload(&app.state::<AppState>())
 }
 
+/// Show the "what to record" popup for a manual start (Record now, hotkey, tray).
+#[tauri::command]
+pub fn open_record_picker(app: AppHandle) {
+    recorder::open_picker(&app);
+}
+
 /// Captions and running notes of the recording in progress (None when idle).
 #[tauri::command]
 pub fn live_snapshot(app: AppHandle) -> Option<crate::live_feed::LiveSnapshot> {

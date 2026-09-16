@@ -26,6 +26,8 @@ pub struct VideoSource {
     pub label: String,
     /// True for the window of the meeting app that was just detected.
     pub is_meeting: bool,
+    /// Owning process (windows only); lets the recorder capture just that app's audio.
+    pub pid: Option<u32>,
 }
 
 /// Displays first, then visible windows (the detected meeting window, if any, first).
@@ -37,6 +39,7 @@ pub fn list_video_sources(state: State<AppState>, meeting_app: Option<String>) -
             label: if m.width > 0 { format!("{} ({}x{}){}", m.name, m.width, m.height, if m.primary { ", primary" } else { "" }) } else { m.name.clone() },
             target: hark_capture::VideoTarget::Monitor { index: m.index },
             is_meeting: false,
+            pid: None,
         })
         .collect();
     let windows = hark_detect::list_visible_windows();
@@ -61,6 +64,7 @@ pub fn list_video_sources(state: State<AppState>, meeting_app: Option<String>) -
         .map(|w| VideoSource {
             is_meeting: meeting_title.as_deref() == Some(w.title.as_str()),
             label: w.title.chars().take(70).collect(),
+            pid: (w.pid != 0).then_some(w.pid),
             target: hark_capture::VideoTarget::Window { title: w.title },
         })
         .collect();

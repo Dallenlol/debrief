@@ -11,6 +11,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use parking_lot::Mutex;
 use std::thread::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -20,16 +21,21 @@ pub struct StartOptions {
     pub app: Option<String>,
     pub video: Option<bool>,
     pub target: Option<VideoTarget>,
+    /// Capture system audio only from this process tree (from the window picker).
+    #[serde(default)]
+    pub audio_pid: Option<u32>,
 }
 
 pub struct ActiveRecording {
     pub meeting: Meeting,
     recorder: Option<Recorder>,
     video: Option<VideoRecorder>,
-    /// Feeds live ASR; dropping it ends the transcriber.
-    pcm_tx: Option<crossbeam_channel::Sender<Vec<f32>>>,
+    /// Feeds live ASR; shared with the forwarder so `stop` can close it from here
+    /// (the only sender) instead of waiting for the capture channel to drain.
+    pcm_tx: Arc<Mutex<Option<crossbeam_channel::Sender<Vec<f32>>>>>,
     live: Option<LiveTranscriber>,
     forwarder: Option<JoinHandle<()>>,
+    forwarder_stop: Arc<AtomicBool>,
     pub highlights: Vec<u64>,
     /// Stops the running-notes loop.
     notes_stop: Arc<AtomicBool>,
@@ -80,6 +86,7 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
             mic_device: settings.mic_device.clone(),
             loopback_device: settings.loopback_device.clone(),
             capture_system: settings.capture_system,
+            audio_pid: opts.audio_pid,
         },
         cap_tx,
     )
@@ -143,21 +150,37 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
         }
     };
 
-    // Forward capture events to the UI and the live transcriber.
+    // Forward capture events to the UI and the live transcriber. Exits on the
+    // stop flag: the capture channel may stay open while a dead stream is
+    // being disposed off-thread, so we never wait for it to close.
+    let pcm_tx = Arc::new(Mutex::new(pcm_tx));
+    let forwarder_stop = Arc::new(AtomicBool::new(false));
     let forwarder = {
         let app = app.clone();
         let pcm_tx = pcm_tx.clone();
+        let stop = forwarder_stop.clone();
         std::thread::spawn(move || {
-            for ev in cap_rx.iter() {
+            loop {
+                let ev = match cap_rx.recv_timeout(std::time::Duration::from_millis(300)) {
+                    Ok(ev) => ev,
+                    Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                        if stop.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        continue;
+                    }
+                    Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
+                };
                 match ev {
                     CaptureEvent::Levels { mic_db, sys_db } => {
                         let _ = app.emit(events::LEVELS, LevelsPayload { mic_db, sys_db });
                     }
                     CaptureEvent::Pcm16k(pcm) => {
-                        if let Some(tx) = &pcm_tx {
+                        if let Some(tx) = pcm_tx.lock().as_ref() {
                             let _ = tx.send(pcm);
                         }
                     }
+                    CaptureEvent::Warning(m) if m.contains("underrun") || m.contains("overrun") => log::debug!("capture: {m}"),
                     CaptureEvent::Warning(m) => notice(&app, "warning", m),
                     CaptureEvent::Error(m) => log::warn!("capture: {m}"),
                     CaptureEvent::Stalled { mic, sys } => reopen_streams(&app, mic, sys),
@@ -173,6 +196,7 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
         pcm_tx,
         live,
         forwarder: Some(forwarder),
+        forwarder_stop,
         highlights: Vec::new(),
         notes_stop,
     });
@@ -188,6 +212,26 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
 
 /// While this meeting records, read attendee names from the meeting window's
 /// accessibility tree every 45 s and merge them into the meeting.
+/// Manual start: ask which window/app to record before anything is captured.
+/// The popup is the same one detection uses, with app "manual" and no countdown.
+pub fn open_picker(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if state.recording.lock().is_some() {
+        return;
+    }
+    let _ = app.emit(
+        events::DETECTION,
+        events::DetectionPayload {
+            app: "manual".into(),
+            label: "Ready to record".into(),
+            title: "Pick the window or app to record.".into(),
+            confidence: 1.0,
+            event: crate::calendar::current_event(&state).map(|e| e.title),
+        },
+    );
+    windows::show_popup_near(app, 0);
+}
+
 /// A stream died (device switched, unplugged, or invalidated by Windows):
 /// rebuild it on the current devices so the recording carries on.
 fn reopen_streams(app: &AppHandle, mic: bool, sys: bool) {
@@ -210,9 +254,23 @@ fn reopen_streams(app: &AppHandle, mic: bool, sys: bool) {
 pub fn recover_orphans(app: &AppHandle) {
     let state = app.state::<AppState>();
     let Ok(meetings) = state.store.list_meetings() else { return };
-    for mut m in meetings.into_iter().filter(|m| m.status == MeetingStatus::Recording) {
+    for mut m in meetings.into_iter().filter(|m| matches!(m.status, MeetingStatus::Recording | MeetingStatus::Processing)) {
         let dir = state.store.recordings_dir(&m.id);
         let mix = dir.join("mix.wav");
+        if m.status == MeetingStatus::Processing {
+            // Interrupted mid-pipeline (crash or kill): just run it again.
+            if !mix.exists() {
+                m.status = MeetingStatus::Failed;
+                m.error = Some("Processing was interrupted and the audio file is missing.".into());
+                let _ = state.store.update_meeting(&m);
+                continue;
+            }
+            log::info!("resuming interrupted processing of {}", m.id);
+            notice(app, "info", format!("Finishing \"{}\" from the last session.", m.title));
+            let app2 = app.clone();
+            std::thread::spawn(move || crate::pipeline::post_process(&app2, m));
+            continue;
+        }
         let duration = hound::WavReader::open(&mix)
             .ok()
             .map(|r| r.len() as i64 * 1000 / (r.spec().sample_rate.max(1) as i64 * r.spec().channels.max(1) as i64))
@@ -318,13 +376,14 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
     if let Some(v) = active.video.take() {
         let _ = v.stop();
     }
-    // Close the live feed and wait for the last window.
-    drop(active.pcm_tx.take());
-    if let Some(l) = active.live.take() {
-        l.join();
-    }
+    // Stop forwarding, close the live feed (its only sender) and wait for the last window.
+    active.forwarder_stop.store(true, Ordering::Relaxed);
     if let Some(f) = active.forwarder.take() {
         let _ = f.join();
+    }
+    drop(active.pcm_tx.lock().take());
+    if let Some(l) = active.live.take() {
+        l.join();
     }
 
     let mut meeting = active.meeting.clone();

@@ -2081,6 +2081,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sherpa-rs",
+ "sherpa-rs-sys",
  "thiserror 2.0.20",
 ]
 

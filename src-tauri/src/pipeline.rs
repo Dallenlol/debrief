@@ -72,14 +72,32 @@ pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) 
             return;
         }
     };
+    // Speaker detection does not need the transcript: run it now, in parallel
+    // with whisper (sidecar processes on the CPU; whisper on the GPU where there is one).
+    let diar_job = settings.diarize_enabled.then(|| {
+        let (app2, dir2) = (app.clone(), dir.clone());
+        std::thread::spawn(move || diarize_raw(&app2, &dir2))
+    });
+    // On CPU-only machines the tier's model may be too slow for a long recording;
+    // pick the best downloaded model that finishes in reasonable time (measured per machine).
+    let audio_ms = (pcm.len() as i64) * 1000 / 16_000;
+    if opts.asr_model.is_none() {
+        quality_id = crate::asr_pick::pick(&state, &quality_id, audio_ms);
+    }
     let mut captions = match state.whisper_or_any(&[&quality_id, &live_id]) {
-        Some(engine) => match engine.transcribe_with(&pcm, 0, settings.language.as_deref(), true, 80) {
-            Ok(c) => c,
-            Err(e) => {
-                fail(&state, &mut meeting, &emit, format!("transcription: {e}"));
-                return;
+        Some(engine) => {
+            let t0 = std::time::Instant::now();
+            match engine.transcribe_with(&pcm, 0, settings.language.as_deref(), true, 80) {
+                Ok(c) => {
+                    crate::asr_pick::record_run(&state.store, engine.model_id(), audio_ms, t0.elapsed().as_secs_f32());
+                    c
+                }
+                Err(e) => {
+                    fail(&state, &mut meeting, &emit, format!("transcription: {e}"));
+                    return;
+                }
             }
-        },
+        }
         None => {
             notice(app, "info", "Transcription skipped: no speech model downloaded. Download one in Settings, then Re-transcribe.".into());
             Vec::new()
@@ -90,8 +108,9 @@ pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) 
     // 3. Diarization -> speaker labels.
     emit("diarize", 0.45, None);
     let spans: Vec<(i64, i64)> = captions.iter().map(|c| (c.start_ms, c.end_ms)).collect();
-    let (labels, speaker_rows, embeddings) = if settings.diarize_enabled && !captions.is_empty() {
-        match diarize_spans(app, &meeting.id, &dir, &spans) {
+    let diar_result = diar_job.map(|h| h.join().unwrap_or_else(|_| Err("diarization thread panicked".into())));
+    let (labels, speaker_rows, embeddings) = if let (Some(result), false) = (diar_result, captions.is_empty()) {
+        match result.and_then(|out| map_diarization(app, &meeting.id, &dir, &spans, out)) {
             Ok(d) => d,
             Err(e) => {
                 log::warn!("diarization skipped: {e}");
@@ -194,8 +213,14 @@ type Diarized = (Vec<Option<String>>, Vec<MeetingSpeaker>, BTreeMap<String, Vec<
 /// transcript segment): per-segment labels, the meeting_speakers rows (with
 /// voice-memory suggestions) and the per-label embeddings.
 fn diarize_spans(app: &AppHandle, meeting_id: &str, dir: &Path, spans: &[(i64, i64)]) -> Result<Diarized, String> {
+    let out = diarize_raw(app, dir)?;
+    map_diarization(app, meeting_id, dir, spans, out)
+}
+
+/// The expensive half: run the sidecar(s) over mix.wav and consolidate the
+/// clusters. Independent of the transcript, so it can run alongside whisper.
+fn diarize_raw(app: &AppHandle, dir: &Path) -> Result<DiarizeOutput, String> {
     let state = app.state::<AppState>();
-    let settings = state.settings.read().clone();
     let mut out = run_diarize_sidecar(&state, &dir.join("mix.wav"))?;
     if out.turns.is_empty() {
         return Err("no speech turns found".into());
@@ -207,6 +232,13 @@ fn diarize_spans(app: &AppHandle, meeting_id: &str, dir: &Path, spans: &[(i64, i
     if out.embeddings.len() < raw_clusters {
         log::info!("diarization: {} clusters consolidated to {}", raw_clusters, out.embeddings.len());
     }
+    Ok(out)
+}
+
+/// The cheap half: attach clusters to transcript spans, name them, match voices.
+fn map_diarization(app: &AppHandle, meeting_id: &str, dir: &Path, spans: &[(i64, i64)], out: DiarizeOutput) -> Result<Diarized, String> {
+    let state = app.state::<AppState>();
+    let settings = state.settings.read().clone();
     let turns = out.turns;
     let clusters = assign_clusters(spans, &turns);
     let me = me_cluster(dir, &turns);
@@ -381,25 +413,50 @@ fn cluster_names(clusters: &[Option<i32>], me: Option<i32>, user_name: &str) -> 
 }
 
 /// Run the `hark-diarize` sidecar on a WAV and parse its JSON.
+/// Diarize `wav`, splitting long recordings into slices that run as parallel
+/// sidecar processes (the speaker-embedding step barely scales across threads
+/// but scales perfectly across processes). Slices are stitched and the same
+/// voice across slices is merged by `consolidate` in the caller.
 fn run_diarize_sidecar(state: &AppState, wav: &Path) -> Result<DiarizeOutput, String> {
-    let bin = state.diarize_bin.as_ref().ok_or("hark-diarize sidecar not found")?;
+    let bin = state.diarize_bin.as_ref().ok_or("hark-diarize sidecar not found")?.clone();
     let (seg, emb) = state.diarize_models().ok_or("speaker models not downloaded")?;
-    let out = std::process::Command::new(bin)
-        .arg("--seg")
-        .arg(&seg)
-        .arg("--emb")
-        .arg(&emb)
-        .arg("--wav")
-        .arg(wav)
-        .stdin(std::process::Stdio::null())
-        .output()
-        .map_err(|e| format!("spawn sidecar: {e}"))?;
-    if !out.status.success() {
-        return Err(format!("sidecar exited with {}: {}", out.status, String::from_utf8_lossy(&out.stderr).trim()));
+    let duration_ms = hound::WavReader::open(wav)
+        .map(|r| r.len() as i64 * 1000 / (r.spec().sample_rate.max(1) as i64 * r.spec().channels.max(1) as i64))
+        .map_err(|e| format!("read {}: {e}", wav.display()))?;
+    let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let workers = hark_diarize::shards::workers_for(cpus);
+    let slices = hark_diarize::shards::plan(duration_ms, workers);
+    let threads = hark_diarize::shards::threads_per_worker(cpus, slices.len());
+    log::info!("diarization: {} slice(s) x {threads} threads for {} ms", slices.len(), duration_ms);
+    let started = std::time::Instant::now();
+    let handles: Vec<_> = slices
+        .iter()
+        .map(|&(start, end)| {
+            let (bin, seg, emb, wav) = (bin.clone(), seg.clone(), emb.clone(), wav.to_path_buf());
+            std::thread::spawn(move || -> Result<DiarizeOutput, String> {
+                let mut cmd = std::process::Command::new(&bin);
+                cmd.arg("--seg").arg(&seg).arg("--emb").arg(&emb).arg("--wav").arg(&wav).arg("--threads").arg(threads.to_string());
+                cmd.arg("--start-ms").arg(start.to_string()).arg("--end-ms").arg(end.to_string());
+                let out = cmd.stdin(std::process::Stdio::null()).output().map_err(|e| format!("spawn sidecar: {e}"))?;
+                if !out.status.success() {
+                    return Err(format!("sidecar exited with {}: {}", out.status, String::from_utf8_lossy(&out.stderr).trim()));
+                }
+                let parsed: DiarizeOutput = serde_json::from_slice(&out.stdout).map_err(|e| format!("sidecar output: {e}"))?;
+                if let Some(e) = parsed.error {
+                    return Err(e);
+                }
+                Ok(parsed)
+            })
+        })
+        .collect();
+    let mut results = Vec::with_capacity(handles.len());
+    let mut dim = 0;
+    for (h, &range) in handles.into_iter().zip(&slices) {
+        let out = h.join().map_err(|_| "sidecar thread panicked".to_string())??;
+        dim = dim.max(out.embedding_dim);
+        results.push((range, out.turns, out.embeddings));
     }
-    let parsed: DiarizeOutput = serde_json::from_slice(&out.stdout).map_err(|e| format!("sidecar output: {e}"))?;
-    if let Some(e) = parsed.error {
-        return Err(e);
-    }
-    Ok(parsed)
+    let (turns, embeddings) = hark_diarize::shards::stitch(results);
+    log::info!("diarization: {} turns, {} clusters in {:.1}s", turns.len(), embeddings.len(), started.elapsed().as_secs_f32());
+    Ok(DiarizeOutput { turns, embeddings, embedding_dim: dim, error: None })
 }

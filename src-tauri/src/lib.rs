@@ -7,6 +7,7 @@ mod pipeline;
 mod recorder;
 mod settings;
 mod shortcuts;
+mod asr_pick;
 mod import;
 mod live_feed;
 mod smoke;

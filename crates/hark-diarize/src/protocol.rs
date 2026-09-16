@@ -12,6 +12,14 @@ pub struct DiarizeRequest {
     pub wav: String,
     #[serde(default = "default_max_embed")]
     pub max_embed_secs: usize,
+    /// Diarize only this window of the file (ms); `None` = whole file.
+    #[serde(default)]
+    pub start_ms: Option<i64>,
+    #[serde(default)]
+    pub end_ms: Option<i64>,
+    /// ONNX threads per model; `None` = the sidecar's default for this machine.
+    #[serde(default)]
+    pub threads: Option<i32>,
 }
 
 fn default_max_embed() -> usize {

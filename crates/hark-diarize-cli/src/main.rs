@@ -1,4 +1,5 @@
-//! `hark-diarize --seg <onnx> --emb <onnx> --wav <wav> [--max-embed-secs N]`
+//! `hark-diarize --seg <onnx> --emb <onnx> --wav <wav> [--max-embed-secs N] [--start-ms A --end-ms B] [--threads T]`
+//! Turn timestamps are relative to `--start-ms` when a window is given.
 //! Reads a WAV (any rate/channels), diarizes, computes one voice embedding per
 //! cluster, prints `DiarizeOutput` JSON on stdout. Progress lines `progress <0..1>`
 //! go to stderr. Exit code 0 even on engine errors (error is in the JSON).
@@ -14,6 +15,7 @@ fn parse_args() -> Result<DiarizeRequest> {
     let mut emb = None;
     let mut wav = None;
     let mut max_embed_secs = 60usize;
+    let (mut start_ms, mut end_ms, mut threads) = (None, None, None);
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -21,6 +23,9 @@ fn parse_args() -> Result<DiarizeRequest> {
             "--emb" => emb = it.next(),
             "--wav" => wav = it.next(),
             "--max-embed-secs" => max_embed_secs = it.next().and_then(|v| v.parse().ok()).unwrap_or(60),
+            "--start-ms" => start_ms = it.next().and_then(|v| v.parse().ok()),
+            "--end-ms" => end_ms = it.next().and_then(|v| v.parse().ok()),
+            "--threads" => threads = it.next().and_then(|v| v.parse().ok()),
             other => return Err(anyhow!("unknown argument {other}")),
         }
     }
@@ -29,6 +34,9 @@ fn parse_args() -> Result<DiarizeRequest> {
         emb_model: emb.ok_or_else(|| anyhow!("--emb required"))?,
         wav: wav.ok_or_else(|| anyhow!("--wav required"))?,
         max_embed_secs,
+        start_ms,
+        end_ms,
+        threads,
     })
 }
 
@@ -82,9 +90,18 @@ fn cluster_audio(pcm: &[f32], turns: &[Turn], cluster: i32, max_secs: usize) -> 
 }
 
 fn run(req: &DiarizeRequest) -> Result<DiarizeOutput> {
-    let pcm = read_wav_16k(Path::new(&req.wav))?;
-    let mut eng = engine::DiarizeEngine::load(Path::new(&req.seg_model), Path::new(&req.emb_model))?;
+    let mut pcm = read_wav_16k(Path::new(&req.wav))?;
+    if req.start_ms.is_some() || req.end_ms.is_some() {
+        let s = (req.start_ms.unwrap_or(0).max(0) as usize * 16).min(pcm.len());
+        let e = req.end_ms.map(|e| (e.max(0) as usize * 16).min(pcm.len())).unwrap_or(pcm.len());
+        pcm = pcm[s..e.max(s)].to_vec();
+    }
+    let t0 = std::time::Instant::now();
+    let threads = req.threads.unwrap_or_else(engine::default_threads);
+    let mut eng = engine::DiarizeEngine::load_with(Path::new(&req.seg_model), Path::new(&req.emb_model), threads, "cpu")?;
     let turns = eng.diarize(&pcm, |p| eprintln!("progress {p:.3}"))?;
+    eprintln!("timing: diarize {:.1}s ({} threads, {} turns)", t0.elapsed().as_secs_f32(), eng.threads, turns.len());
+    let t1 = std::time::Instant::now();
     let mut out = DiarizeOutput { turns: turns.clone(), embedding_dim: eng.embedding_dim, ..Default::default() };
     let mut clusters: Vec<i32> = turns.iter().map(|t| t.cluster).collect();
     clusters.sort_unstable();
@@ -101,6 +118,7 @@ fn run(req: &DiarizeRequest) -> Result<DiarizeOutput> {
             Err(e) => eprintln!("embed cluster {c}: {e}"),
         }
     }
+    eprintln!("timing: embeddings {:.1}s ({} clusters)", t1.elapsed().as_secs_f32(), out.embeddings.len());
     Ok(out)
 }
 

@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 sherpa-rs = { version = "0.6", default-features = false, features = ["download-binaries"] }
+sherpa-rs-sys = { version = "0.6.8", default-features = false, features = ["download-binaries"] }
 hark-diarize = { path = "../hark-diarize" }
 hound = "3.5"
 serde.workspace = true

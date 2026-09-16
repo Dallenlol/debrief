@@ -111,7 +111,7 @@ impl AppState {
         log::info!("loading whisper {model_id} from {}", path.display());
         match WhisperEngine::load(&path, use_gpu) {
             Ok(w) => {
-                let w = Arc::new(w);
+                let w = Arc::new(w.tagged(model_id));
                 let mut e = self.engines.lock();
                 e.whisper.insert(model_id.to_string(), w.clone());
                 e.last_used = Some(Instant::now());

@@ -26,6 +26,8 @@ pub struct WhisperEngine {
     ctx: WhisperContext,
     threads: i32,
     pub gpu: bool,
+    /// Catalog id of the loaded model ("" when loaded from an arbitrary path).
+    pub model_id: String,
 }
 
 impl WhisperEngine {
@@ -44,12 +46,22 @@ impl WhisperEngine {
         };
         if use_gpu {
             if let Ok(ctx) = try_load(true) {
-                return Ok(WhisperEngine { ctx, threads, gpu: true });
+                return Ok(WhisperEngine { ctx, threads, gpu: true, model_id: String::new() });
             }
             tracing::warn!("whisper GPU init failed; falling back to CPU");
         }
         let ctx = try_load(false).map_err(|e| AsrError::Whisper(e.to_string()))?;
-        Ok(WhisperEngine { ctx, threads, gpu: false })
+        Ok(WhisperEngine { ctx, threads, gpu: false, model_id: String::new() })
+    }
+
+    /// Tag the engine with the catalog id it was loaded from.
+    pub fn tagged(mut self, model_id: &str) -> Self {
+        self.model_id = model_id.to_string();
+        self
+    }
+
+    pub fn model_id(&self) -> &str {
+        &self.model_id
     }
 
     /// Transcribe 16 kHz mono f32 audio. Timestamps are shifted by `offset_ms`.

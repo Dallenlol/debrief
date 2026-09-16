@@ -7,6 +7,7 @@ pub mod consolidate;
 pub mod identify;
 pub mod merge;
 pub mod protocol;
+pub mod shards;
 
 pub use consolidate::consolidate;
 pub use identify::{best_match, centroid, cosine, KnownSpeaker};

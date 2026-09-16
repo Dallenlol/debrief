@@ -108,8 +108,8 @@
       "llm": "qwen3-1.7b-q4"
     },
     "cpu_high": {
-      "asr_live": "whisper-small",
-      "asr_quality": "whisper-medium",
+      "asr_live": "whisper-base",
+      "asr_quality": "whisper-small",
       "llm": "qwen3-4b-q4"
     },
     "gpu": {

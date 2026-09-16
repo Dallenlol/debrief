@@ -108,6 +108,25 @@ walk(path.join(targetDir, "build"), 5, (p) => /llama-cpp-sys-2-|sherpa-rs-sys-/.
 for (const cache of [path.join(os.homedir(), ".cache", "sherpa-rs"), path.join(os.homedir(), "Library", "Caches", "sherpa-rs"), path.join(os.homedir(), "AppData", "Local", "sherpa-rs")]) {
   walk(cache, 6, consider);
 }
+// CUDA builds: ggml-cuda.dll imports cuBLAS, which only exists on machines with the
+// toolkit installed - ship the runtime DLLs (redistributable) from CUDA_PATH.
+if (win && /cuda/.test(features)) {
+  const cudaPath = process.env.CUDA_PATH;
+  if (!cudaPath) {
+    console.error("[prepare-bundle] --features cuda needs CUDA_PATH to collect cublas/cudart runtime DLLs");
+    process.exit(1);
+  }
+  for (const dir of [path.join(cudaPath, "bin"), path.join(cudaPath, "bin", "x64")]) {
+    for (const f of safeReaddir(dir)) {
+      if (/^(cublas64_|cublasLt64_|cudart64_)\d+\.dll$/i.test(f)) consider(path.join(dir, f));
+    }
+  }
+  const cublas = [...found.keys()].some((k) => /^cublas64_/i.test(k));
+  if (!cublas) {
+    console.error("[prepare-bundle] cublas64_*.dll not found under CUDA_PATH");
+    process.exit(1);
+  }
+}
 let n = 0;
 for (const [name, { path: p }] of found) {
   copyFileSync(p, path.join(resDir, name));

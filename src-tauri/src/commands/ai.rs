@@ -66,6 +66,7 @@ pub fn generate_summary(app: AppHandle, id: String, template_id: Option<String>)
 pub async fn draft_followup(app: AppHandle, id: String) -> CmdResult<String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
+        let _busy = state.busy_guard();
         let backend = state.llm().ok_or("No language model available. Download one in Settings or connect an endpoint.")?;
         let meeting = state.store.get_meeting(&id).map_err(err)?.ok_or("meeting not found")?;
         let settings = state.settings.read().clone();
@@ -178,6 +179,7 @@ pub fn send_chat(app: AppHandle, chat_id: String, text: String) -> CmdResult<Cha
     let scope_meeting = if chat.scope_kind == "meeting" { chat.scope_id.clone() } else { None };
     std::thread::spawn(move || {
         let state = app2.state::<AppState>();
+        let _busy = state.busy_guard();
         // Retrieval: BM25 + embeddings (when available); a single short meeting is passed whole.
         let mut hits = match &scope_meeting {
             Some(mid) => {

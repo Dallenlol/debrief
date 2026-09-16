@@ -15,6 +15,9 @@
 - **Fix: playback.** The player could not load the recording (asset scope did not match the data folder), so meetings played as 0:00.
 - **Fix: CPU installer on GPU machines.** The plain (non-CUDA) build picked the GPU-sized models whenever an NVIDIA card was present and then ran them on the CPU; it now sizes for the CPU.
 - **Build: portable CPU code.** whisper.cpp was compiled for the build machine's CPU (AVX-512 here), which crashes on CPUs without it; every build now targets AVX2 (2013+). CI cache key bumped.
+- **Fix: long calls no longer come back with hundreds of "speakers".** Diarization clusters with almost no speech are folded into the nearest voice and the count is capped at eight; an 88-minute Teams call went from 288 labels to 8.
+- **Fix: the AI engines stayed loaded through long jobs.** The idle unloader could drop the language model in the middle of clean-up on a long meeting, silently leaving no clean text, summary or search index.
+- **Fix: the CUDA installer really uses the GPU.** The bundle script could ship a CPU `ggml.dll` next to the CUDA build; it now collects only the current build's libraries (94 tokens/s vs 9 on an RTX 3080).
 - Build: the workspace test run no longer breaks when the sherpa-onnx download cache is gone.
 
 ## 0.2.0 - 2026-09-14

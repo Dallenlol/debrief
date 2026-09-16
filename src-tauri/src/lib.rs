@@ -178,7 +178,7 @@ fn spawn_engine_idle_unloader(app: tauri::AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_secs(60));
         let state = app.state::<AppState>();
-        if state.recording.lock().is_some() {
+        if state.recording.lock().is_some() || state.busy.load(std::sync::atomic::Ordering::SeqCst) > 0 {
             continue;
         }
         let idle = state.engines.lock().last_used.map(|t| t.elapsed() > std::time::Duration::from_secs(600)).unwrap_or(false);

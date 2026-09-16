@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Generate the summary for a meeting with `template_id` (or the default) and store it.
 pub fn run_summary(app: &AppHandle, meeting_id: &str, template_id: Option<&str>) {
     let state = app.state::<AppState>();
+    let _busy = state.busy_guard();
     let settings = state.settings.read().clone();
     let emit = |stage: &'static str, progress: f32, error: Option<String>| {
         let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting_id.to_string(), stage, progress, error });

@@ -115,6 +115,7 @@ pub fn spawn_notes_loop(app: AppHandle, meeting_id: String, stop: Arc<AtomicBool
                 continue;
             };
             let previous = state.live_feed.lock().as_ref().map(|f| f.notes.clone()).unwrap_or_default();
+            let _busy = state.busy_guard();
             let t0 = Instant::now();
             match hark_llm::live_notes::update(backend.as_ref(), &previous, &new_text) {
                 Ok(notes) => {

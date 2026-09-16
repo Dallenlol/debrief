@@ -29,6 +29,7 @@ pub fn post_process(app: &AppHandle, meeting: Meeting) {
 
 pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) {
     let state = app.state::<AppState>();
+    let _busy = state.busy_guard();
     let dir = state.store.recordings_dir(&meeting.id);
     let settings = state.settings.read().clone();
     let meeting_id = meeting.id.clone();
@@ -126,7 +127,9 @@ pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) 
     if settings.cleanup_enabled && !segs.is_empty() {
         run_cleanup(app, &meeting.id);
     }
-    let _ = state.store.rebuild_chunks(&meeting.id);
+    if let Err(e) = state.store.rebuild_chunks(&meeting.id) {
+        log::error!("rebuild chunks: {e}");
+    }
     emit("embed", 0.85, None);
     if let Err(e) = crate::embed_stage::embed_meeting(app, &meeting.id) {
         log::warn!("embedding failed: {e}");
@@ -147,6 +150,7 @@ pub use crate::summary_stage::run_summary;
 /// Re-run only the cleanup pass on stored segments.
 pub fn run_cleanup(app: &AppHandle, meeting_id: &str) {
     let state = app.state::<AppState>();
+    let _busy = state.busy_guard();
     let Some(backend) = state.llm() else {
         notice(app, "info", "Transcript cleanup skipped: no language model available. Download one in Settings or point Hark at an endpoint.".into());
         let _ = state.store.set_meeting_error(meeting_id, Some(NO_LLM));
@@ -192,9 +196,16 @@ type Diarized = (Vec<Option<String>>, Vec<MeetingSpeaker>, BTreeMap<String, Vec<
 fn diarize_spans(app: &AppHandle, meeting_id: &str, dir: &Path, spans: &[(i64, i64)]) -> Result<Diarized, String> {
     let state = app.state::<AppState>();
     let settings = state.settings.read().clone();
-    let out = run_diarize_sidecar(&state, &dir.join("mix.wav"))?;
+    let mut out = run_diarize_sidecar(&state, &dir.join("mix.wav"))?;
     if out.turns.is_empty() {
         return Err("no speech turns found".into());
+    }
+    // Long, noisy calls come back over-segmented (hundreds of clusters); fold the
+    // slivers into their nearest voice and cap the count at a plausible meeting.
+    let raw_clusters = out.embeddings.len();
+    hark_diarize::consolidate(&mut out.turns, &mut out.embeddings, hark_diarize::consolidate::MAX_SPEAKERS);
+    if out.embeddings.len() < raw_clusters {
+        log::info!("diarization: {} clusters consolidated to {}", raw_clusters, out.embeddings.len());
     }
     let turns = out.turns;
     let clusters = assign_clusters(spans, &turns);
@@ -251,7 +262,9 @@ pub fn rediarize(app: &AppHandle, meeting_id: &str) -> Result<(), String> {
             let _ = state.store.set_meeting_speakers(meeting_id, &rows);
             let _ = state.store.set_setting(&format!("speaker_embeddings:{meeting_id}"), &embeddings);
             let _ = state.store.set_meeting_error(meeting_id, None);
-            let _ = state.store.rebuild_chunks(meeting_id);
+            if let Err(e) = state.store.rebuild_chunks(meeting_id) {
+                log::error!("rebuild chunks: {e}");
+            }
             let _ = crate::embed_stage::embed_meeting(app, meeting_id);
             emit("done", 1.0, None);
             Ok(())
@@ -267,6 +280,7 @@ pub fn rediarize(app: &AppHandle, meeting_id: &str) -> Result<(), String> {
 /// Rebuild retrieval chunks and their embeddings.
 pub fn reembed(app: &AppHandle, meeting_id: &str) -> Result<usize, String> {
     let state = app.state::<AppState>();
+    let _busy = state.busy_guard();
     let emit = |stage: &'static str, progress: f32, error: Option<String>| {
         let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting_id.to_string(), stage, progress, error });
     };

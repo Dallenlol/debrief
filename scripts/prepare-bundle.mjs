@@ -73,7 +73,10 @@ const featArgs = features ? ["--features", features] : [];
 // and diarization is quick on CPU).
 log(`building hark-diarize sidecar (${profile})...`);
 execFileSync("cargo", ["build", "-p", "hark-diarize-cli", ...profileArgs, ...targetArgs], { stdio: "inherit", cwd: root });
-const targetDir = triple === hostTriple ? path.join(root, "target", profile) : path.join(root, "target", triple, profile);
+// Honour CARGO_TARGET_DIR so a second variant (e.g. a CUDA build in target-cuda/) is
+// collected from its own tree and never mixes with another variant's libraries.
+const targetRoot = process.env.CARGO_TARGET_DIR ? path.resolve(process.env.CARGO_TARGET_DIR) : path.join(root, "target");
+const targetDir = triple === hostTriple ? path.join(targetRoot, profile) : path.join(targetRoot, triple, profile);
 copyFileSync(path.join(targetDir, `hark-diarize${exe}`), path.join(binDir, `hark-diarize-${triple}${exe}`));
 log("hark-diarize sidecar copied");
 
@@ -85,6 +88,11 @@ log(`building hark-llm (${profile}) to ensure runtime libraries exist...`);
 execFileSync("cargo", ["build", "-p", "hark-llm", ...profileArgs, ...featArgs, ...targetArgs], { stdio: "inherit", cwd: root });
 const libExt = win ? ".dll" : mac ? ".dylib" : ".so";
 const isLib = (f) => f.includes(libExt) && !f.startsWith("hark_lib") && !f.startsWith("libhark_lib");
+// Start clean: a library left over from a previous variant (CPU ggml.dll next to a CUDA
+// build, say) would otherwise ship and silently disable the GPU.
+for (const f of safeReaddir(resDir)) {
+  if (f.includes(libExt)) rmSync(path.join(resDir, f), { force: true });
+}
 const found = new Map(); // name -> path (newest wins)
 const consider = (p) => {
   const name = path.basename(p);

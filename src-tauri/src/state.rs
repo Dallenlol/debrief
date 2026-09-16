@@ -31,6 +31,9 @@ pub struct AppState {
     pub recording: Mutex<Option<ActiveRecording>>,
     /// Captions + running notes of the recording in progress (for the Meeting page).
     pub live_feed: Mutex<Option<crate::live_feed::LiveFeed>>,
+    /// Pipelines (post-processing, re-runs, chat) currently using the engines;
+    /// the idle unloader leaves them alone while this is > 0.
+    pub busy: std::sync::atomic::AtomicUsize,
     pub engines: Mutex<Engines>,
     /// Detector is paused (user toggle or while recording).
     pub detection_paused: AtomicBool,
@@ -76,6 +79,7 @@ impl AppState {
             chat_cancels: Mutex::new(HashMap::new()),
             rename_seq: Mutex::new(HashMap::new()),
             live_feed: Mutex::new(None),
+            busy: std::sync::atomic::AtomicUsize::new(0),
             share_server: Mutex::new(None),
             calendar: RwLock::new(Vec::new()),
             calendar_errors: RwLock::new(Vec::new()),
@@ -204,6 +208,12 @@ impl AppState {
         Some(engine)
     }
 
+    /// RAII marker: engines stay loaded while any `BusyGuard` is alive.
+    pub fn busy_guard(&self) -> BusyGuard<'_> {
+        self.busy.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        BusyGuard(self)
+    }
+
     pub fn unload_engines(&self) {
         let mut e = self.engines.lock();
         e.whisper.clear();
@@ -239,4 +249,13 @@ fn find_sidecar(name: &str) -> Option<PathBuf> {
 fn which(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
     std::env::split_paths(&path).map(|d| d.join(name)).find(|p| p.is_file())
+}
+
+pub struct BusyGuard<'a>(&'a AppState);
+
+impl Drop for BusyGuard<'_> {
+    fn drop(&mut self) {
+        self.0.busy.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        self.0.engines.lock().last_used = Some(Instant::now());
+    }
 }

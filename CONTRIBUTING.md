@@ -26,15 +26,19 @@ cargo clippy --workspace --all-targets -- -D warnings
 pnpm test && pnpm typecheck
 ```
 
-Run the headless smoke (records 8 s, transcribes, diarizes, summarises) after building the app:
+Run the headless smoke (records 8 s, transcribes, diarizes, summarises) after building the app with `pnpm tauri build --no-bundle` (a plain `cargo build` produces a dev binary that expects the Vite dev server):
 
 ```bash
-HARK_SMOKE=1 HARK_SMOKE_CHAT=1 ./target/debug/hark
+HARK_SMOKE=1 HARK_SMOKE_CHAT=1 ./target/release/hark
 ```
 
 ## Where things live
 
 `docs/dev/architecture.md` has the crate map. Pure logic goes in crates with unit tests; Tauri glue stays in `src-tauri/`; the UI never touches files directly.
+
+To drive the real built app for an end-to-end check, launch it with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` and attach with `playwright-core`'s `connectOverCDP`; the main window is the `tauri.localhost` page without `?window=`. Native dialogs cannot be driven that way - call the command (`import_recording`, `start_recording`, ...) through `window.__TAURI_INTERNALS__.invoke` instead.
+
+Build hygiene: the CPU build must stay portable (`.cargo/config.toml` pins ggml to AVX2 - never `GGML_NATIVE`); `cargo clean -p <crate>` only clears the dev profile, add `--release` when a build-script input changed. A second variant (CUDA) should use its own `CARGO_TARGET_DIR`; `scripts/prepare-bundle.mjs` honours it and clears stale runtime libraries before collecting.
 
 ## Pull requests
 

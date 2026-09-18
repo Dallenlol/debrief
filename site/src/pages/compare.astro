@@ -5,7 +5,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const rows: [string, string, string, string, string][] = [
   ["Price", "Free, MIT open source", "Free tier; paid plans for teams and integrations", "Free tier with minute limits; paid plans", "Free tier with limits; paid plans"],
   ["Where recordings live", "Your computer only", "Their cloud", "Their cloud", "Their cloud"],
-  ["How it captures", "Records mic + system audio on your PC", "Bot joins the call", "Bot joins the call", "Bot joins the call"],
+  ["How it captures", "Records mic + the meeting app's audio on your PC (per-app on Windows)", "Bot joins the call", "Bot joins the call", "Bot joins the call"],
   ["Visible to other participants", "No", "Yes (bot in participant list)", "Yes", "Yes"],
   ["Works offline", "Yes", "No", "No", "No"],
   ["Account required", "No", "Yes", "Yes", "Yes"],
@@ -13,6 +13,9 @@ const rows: [string, string, string, string, string][] = [
   ["Speaker identification", "On-device, with confirmable voice memory", "Yes", "Yes", "Yes"],
   ["AI summaries", "On-device (Qwen3) from editable templates", "Cloud, templates on paid plans", "Cloud", "Cloud"],
   ["Ask questions about meetings", "On-device, across your library, timestamp citations", "Cloud", "Cloud", "Cloud"],
+  ["Live captions and notes during the call", "Yes, on-device", "Yes", "Yes", "Yes"],
+  ["Import existing recordings", "Yes (audio and video files)", "Yes", "Yes", "Yes"],
+  ["Follow-up email and exports", "On-device draft; .txt / .srt / .md", "Paid plans", "Paid plans", "Yes"],
   ["Screen / video recording", "Optional", "Yes", "No", "No"],
   ["Sharing", "Links on your network, exportable bundles and web pages", "Cloud links", "Cloud links", "Cloud links"],
   ["Bring your own model", "Yes (Ollama, LM Studio, any OpenAI-compatible server)", "No", "No", "No"],

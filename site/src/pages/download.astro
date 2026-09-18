@@ -14,12 +14,12 @@ import { SITE } from "../site";
   <div class="grid">
     <div class="card">
       <h3>Windows, NVIDIA GPU</h3>
-      <p class="muted">Uses CUDA for fast transcription and summaries. Needs a GeForce GTX 10-series or newer with 6 GB+ VRAM and a recent driver.</p>
+      <p class="muted">Uses CUDA for fast transcription and summaries: an 88-minute call is fully processed in about 10 minutes. Needs a GeForce GTX 10-series or newer with 6 GB+ VRAM and a recent driver; nothing else to install.</p>
       <a class="btn primary" href={SITE.releases}>Download CUDA installer</a>
     </div>
     <div class="card">
       <h3>Windows, any PC</h3>
-      <p class="muted">Runs on the CPU. Works on any 64-bit Windows 10/11 machine with 8 GB of RAM. Slower, but fully featured.</p>
+      <p class="muted">Runs on the CPU. Works on any 64-bit Windows 10/11 machine with 8 GB of RAM and an AVX2 CPU (2013 or newer). Slower, but fully featured; Hark sizes the models to your machine so long calls still finish in reasonable time.</p>
       <a class="btn primary" href={SITE.releases}>Download CPU installer</a>
     </div>
     <div class="card">
@@ -39,7 +39,8 @@ import { SITE } from "../site";
     <ol class="muted" style="line-height: 1.8;">
       <li>Open Hark. It checks your mic and system audio, then suggests model sizes for your hardware.</li>
       <li>Download the models once (from Hugging Face, checksum-verified, 1 to 7 GB depending on tier).</li>
-      <li>Join a call. When the popup appears, click <b>Record</b>. Or press <code>Ctrl/Cmd+Shift+R</code> anytime.</li>
+      <li>Join a call. When the popup appears, check the window and audio choice and click <b>Record</b>. Or press <code>Ctrl/Cmd+Shift+R</code> anytime to open the same picker.</li>
+      <li>Open the recording from the Library to follow captions and running notes while the call is on.</li>
     </ol>
     <h2 style="margin-top: 40px;">Unsigned builds</h2>
     <p class="muted">Hark's installers are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper will warn on first launch. On Windows choose "More info, Run anyway"; on macOS right-click the app and choose Open. Every release lists SHA-256 checksums, and you can always <a href={`${SITE.repo}#building-from-source`}>build from source</a>.</p>

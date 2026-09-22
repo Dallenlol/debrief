@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" alt="" width="72" height="72" align="left" />
+
 # Hark
 
 **A free, open-source meeting recorder that keeps everything on your computer.**

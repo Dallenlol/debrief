@@ -44,7 +44,7 @@ export function Shell() {
         <div className="flex items-center gap-2 px-5 pt-5 pb-4">
           <span className="grid h-7 w-7 place-items-center rounded-md bg-ink text-canvas">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M4 12v2M8 8v8M12 5v14M16 8v8M20 11v3" />
+              <path d="M9 6v12M15 6v12M9 11.4h6" />
             </svg>
           </span>
           <span className="font-serif text-[22px] leading-none tracking-tight">Hark</span>

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A real app icon.** Hark ships with its own mark - two level-meter bars standing as the stems of an H, crossed in ember - instead of the default purple square, on Windows, macOS, the tray, the site and the favicon. `scripts/make-icons.py` redraws every size from one source.
+
 - **Speakers panel.** The meeting page lists everyone Hark heard, with a name field, the voice-memory suggestion and how much each said. Naming two rows the same person **merges** them - one voice split into "Speaker 2" and "Speaker 5" becomes one person everywhere (transcript, talk time, summary, search), and the voiceprints are blended so the next meeting recognises them. "Same person as" does the same from a picker. Merging into a row still called "Speaker 3" no longer invents a person called "Speaker 3" in voice memory.
 
 ## 0.3.0 - 2026-09-15

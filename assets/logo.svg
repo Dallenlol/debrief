@@ -1,0 +1,10 @@
+<!-- Hark logo. Same geometry as scripts/make-icons.py (1024 grid); keep them in step.
+     ink tile oklch(0.2 0.01 60), paper stems oklch(0.985 0.006 80), ember crossbar oklch(0.62 0.2 32). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Hark">
+  <rect x="88" y="88" width="848" height="848" rx="190" fill="#1a1512" />
+  <g fill="#fcfaf6">
+    <rect x="357" y="292" width="78" height="440" rx="39" />
+    <rect x="589" y="292" width="78" height="440" rx="39" />
+  </g>
+  <rect x="434" y="470" width="156" height="56" fill="#e5462c" />
+</svg>

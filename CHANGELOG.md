@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-09-22
 
 - **A real app icon.** Hark ships with its own mark - two level-meter bars standing as the stems of an H, crossed in ember - instead of the default purple square, on Windows, macOS, the tray, the site and the favicon. `scripts/make-icons.py` redraws every size from one source.
 

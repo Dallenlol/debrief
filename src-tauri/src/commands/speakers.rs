@@ -1,7 +1,8 @@
 use super::{err, CmdResult};
 use crate::pipeline;
 use crate::state::AppState;
-use hark_store::{MeetingSpeaker, Speaker};
+use crate::recorder::notice;
+use hark_store::{MeetingSpeaker, RenameOutcome, Speaker};
 use std::collections::BTreeMap;
 use tauri::{AppHandle, Manager, State};
 
@@ -16,22 +17,40 @@ pub fn meeting_speakers(state: State<AppState>, id: String) -> CmdResult<Vec<Mee
 }
 
 /// Rename a label ("Speaker 2") to a person's name everywhere in this meeting.
-/// The voiceprint is stored so future meetings can suggest the name.
+/// Giving two labels the same name merges them into one person. The voiceprint
+/// is stored so future meetings can suggest the name.
 #[tauri::command]
-pub fn rename_speaker(app: AppHandle, id: String, label: String, name: String) -> CmdResult<Speaker> {
+pub fn rename_speaker(app: AppHandle, id: String, label: String, name: String) -> CmdResult<RenameOutcome> {
     let state = app.state::<AppState>();
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("name cannot be empty".into());
     }
     let emb = stored_embedding(&state, &id, &label);
-    let speaker = state.store.rename_speaker(&id, &label, &name, emb.as_deref()).map_err(err)?;
-    // Keep the embedding reachable under the new label for further renames.
-    if let Some(e) = emb {
-        let mut map: BTreeMap<String, Vec<f32>> = state.store.get_setting(&format!("speaker_embeddings:{id}")).ok().flatten().unwrap_or_default();
-        map.remove(&label);
-        map.insert(speaker.name.clone(), e);
-        let _ = state.store.set_setting(&format!("speaker_embeddings:{id}"), &map);
+    let outcome = state.store.rename_speaker(&id, &label, &name, emb.as_deref()).map_err(err)?;
+    // Keep a voiceprint reachable under the new label for further renames. After a
+    // merge that is the blended print of both voices, not just the one we moved.
+    {
+        let key = format!("speaker_embeddings:{id}");
+        let mut map: BTreeMap<String, Vec<f32>> = state.store.get_setting(&key).ok().flatten().unwrap_or_default();
+        let had = map.remove(&label);
+        let blended = outcome.speaker.as_ref().map(|s| s.embedding.clone()).filter(|e| !e.is_empty()).or(had);
+        if let Some(e) = blended {
+            map.insert(outcome.name.clone(), e);
+        }
+        let _ = state.store.set_setting(&key, &map);
+    }
+    if let Some(from) = &outcome.merged_from {
+        notice(
+            &app,
+            "info",
+            format!(
+                "Merged {from} into {} - {} segment{} moved.",
+                outcome.name,
+                outcome.moved_segments,
+                if outcome.moved_segments == 1 { "" } else { "s" }
+            ),
+        );
     }
     // Retrieval chunks bake the speaker label into their text; rebuild them (and
     // their embeddings) so Ask Hark knows who the renamed voice is. An existing
@@ -56,12 +75,12 @@ pub fn rename_speaker(app: AppHandle, id: String, label: String, name: String) -
             crate::summary_stage::run_summary(&app2, &id, Some(&existing.template_id));
         }
     });
-    Ok(speaker)
+    Ok(outcome)
 }
 
 /// Accept the "Is this Sarah?" suggestion for a label.
 #[tauri::command]
-pub fn accept_speaker_suggestion(app: AppHandle, id: String, label: String) -> CmdResult<Speaker> {
+pub fn accept_speaker_suggestion(app: AppHandle, id: String, label: String) -> CmdResult<RenameOutcome> {
     let rows = app.state::<AppState>().store.meeting_speakers(&id).map_err(err)?;
     let row = rows.into_iter().find(|r| r.label == label).ok_or("unknown speaker label")?;
     let name = row.suggested_name.ok_or("no suggestion for this speaker")?;

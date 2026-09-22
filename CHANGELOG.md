@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Speakers panel.** The meeting page lists everyone Hark heard, with a name field, the voice-memory suggestion and how much each said. Naming two rows the same person **merges** them - one voice split into "Speaker 2" and "Speaker 5" becomes one person everywhere (transcript, talk time, summary, search), and the voiceprints are blended so the next meeting recognises them. "Same person as" does the same from a picker. Merging into a row still called "Speaker 3" no longer invents a person called "Speaker 3" in voice memory.
+
 ## 0.3.0 - 2026-09-15
 
 - **Pick what to record, every time.** Record now, the hotkey, the tray and the call popup all open the same picker: choose the meeting window (or a display), and on Windows Hark captures **only that app's audio** plus your mic - music, notifications and other calls stay out. "Everything playing" is one click away.

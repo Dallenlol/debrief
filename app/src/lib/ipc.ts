@@ -66,12 +66,30 @@ export interface Speaker {
   name: string;
 }
 
+export interface SpeakerStat {
+  label: string;
+  segments: number;
+  /** Total speaking time in milliseconds. */
+  ms: number;
+  first_ms: number;
+}
+
+export interface RenameOutcome {
+  speaker: Speaker | null;
+  /** The label every affected segment now carries. */
+  name: string;
+  /** Set when this rename merged two labels into one person. */
+  merged_from: string | null;
+  moved_segments: number;
+}
+
 export interface MeetingDetail {
   meeting: Meeting;
   segments: Segment[];
   media: { audio: string; video: string | null };
   highlights: number[];
   speakers: MeetingSpeaker[];
+  speaker_stats: SpeakerStat[];
 }
 
 export interface SearchHit {
@@ -300,7 +318,8 @@ export const cmd = {
   removeModel: (id: string) => invoke<void>("remove_model", { id }),
 
   meetingSpeakers: (id: string) => invoke<MeetingSpeaker[]>("meeting_speakers", { id }),
-  renameSpeaker: (id: string, label: string, name: string) => invoke<Speaker>("rename_speaker", { id, label, name }),
+  renameSpeaker: (id: string, label: string, name: string) =>
+    invoke<RenameOutcome>("rename_speaker", { id, label, name }),
   acceptSpeakerSuggestion: (id: string, label: string) => invoke<Speaker>("accept_speaker_suggestion", { id, label }),
   listKnownSpeakers: () => invoke<Speaker[]>("list_known_speakers"),
   deleteKnownSpeaker: (id: string) => invoke<void>("delete_known_speaker", { id }),

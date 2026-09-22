@@ -37,3 +37,9 @@ On startup Hark fetches one small file (`latest.json`) from GitHub releases. If 
 ## Does the webhook send my data somewhere?
 
 Only if you turn it on and enter a URL. Then each finished meeting (title, attendees, summary, transcript) is POSTed to that address once. There is a "Send test" button so you can see the shape of the payload first.
+
+## Hark split one person into two speakers. How do I fix it?
+
+On the meeting page, the **Speakers** list shows every voice it found. Give the extra row the same name as the real person - type it, or pick the person under "Same person as". Both rows become one: the transcript, talk time, summary and search all update, and the two voiceprints are blended so the next meeting recognises that person more reliably.
+
+The reverse (one row that is really two people) needs a re-run: **Re-run > Speaker detection only**, which re-clusters the voices from the audio.

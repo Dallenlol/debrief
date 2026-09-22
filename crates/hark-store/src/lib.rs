@@ -18,7 +18,7 @@ pub use db::{data_dir, default_data_dir, write_data_dir_pointer, Store};
 pub use meetings::{Meeting, MeetingStatus};
 pub use organize::{Folder, MeetingFilter, Share, Tag};
 pub use segments::{NewSegment, SearchHit, Segment};
-pub use speakers::{MeetingSpeaker, Speaker};
+pub use speakers::{MeetingSpeaker, RenameOutcome, Speaker, SpeakerStat};
 pub use vectors::{cosine, fuse_hits};
 
 #[derive(Debug, thiserror::Error)]
@@ -29,6 +29,8 @@ pub enum StoreError {
     Json(#[from] serde_json::Error),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
+    #[error("{0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, StoreError>;

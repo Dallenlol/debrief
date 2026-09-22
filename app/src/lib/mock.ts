@@ -30,6 +30,12 @@ const detail: MeetingDetail = {
   highlights: [30_000, 80_000],
   speakers: [
     { meeting_id: "m1", label: "Sam", speaker_id: null, suggested_id: "s1", suggested_name: "Sam Ortiz", suggested_score: 0.83 },
+    { meeting_id: "m1", label: "Speaker 3", speaker_id: null, suggested_id: null, suggested_name: null, suggested_score: null },
+  ],
+  speaker_stats: [
+    { label: "Sam", segments: 14, ms: 5 * 60_000 + 12_000, first_ms: 0 },
+    { label: "Priya", segments: 9, ms: 3 * 60_000 + 40_000, first_ms: 18_000 },
+    { label: "Speaker 3", segments: 4, ms: 52_000, first_ms: 96_000 },
   ],
 };
 
@@ -106,6 +112,7 @@ const table: Record<string, (args: Record<string, unknown>) => unknown> = {
   list_shares: () => [],
   list_audio_devices: () => ({ inputs: [], outputs: [] }),
   list_known_speakers: () => [{ id: "s1", name: "Sarah Chen" }, { id: "s2", name: "Priya Patel" }],
+  rename_speaker: ({ label, name }) => ({ speaker: { id: "s1", name }, name, merged_from: label === name ? null : null, moved_segments: 3 }),
   list_video_sources: () => [
     { target: { kind: "monitor", index: 0 }, label: "DISPLAY1 (2560x1440), primary", is_meeting: false },
     { target: { kind: "monitor", index: 1 }, label: "DISPLAY2 (1920x1080)", is_meeting: false },

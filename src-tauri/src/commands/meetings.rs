@@ -1,7 +1,7 @@
 use super::{err, CmdResult};
 use crate::recorder;
 use crate::state::AppState;
-use hark_store::{Meeting, MeetingSpeaker, SearchHit, Segment};
+use hark_store::{Meeting, MeetingSpeaker, SearchHit, Segment, SpeakerStat};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
@@ -18,6 +18,8 @@ pub struct MeetingDetail {
     pub media: Media,
     pub highlights: Vec<u64>,
     pub speakers: Vec<MeetingSpeaker>,
+    /// One row per speaker label actually used in the transcript, first-heard order.
+    pub speaker_stats: Vec<SpeakerStat>,
 }
 
 #[tauri::command]
@@ -37,7 +39,8 @@ pub fn get_meeting(state: State<AppState>, id: String) -> CmdResult<MeetingDetai
     };
     let highlights = state.store.get_setting::<Vec<u64>>(&format!("highlights:{id}")).map_err(err)?.unwrap_or_default();
     let speakers = state.store.meeting_speakers(&id).map_err(err)?;
-    Ok(MeetingDetail { meeting, segments, media, highlights, speakers })
+    let speaker_stats = state.store.speaker_stats(&id).map_err(err)?;
+    Ok(MeetingDetail { meeting, segments, media, highlights, speakers, speaker_stats })
 }
 
 #[tauri::command]

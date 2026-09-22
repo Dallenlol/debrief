@@ -62,7 +62,7 @@ fn smoke(app: &AppHandle) -> Result<(), String> {
                         state.store.get_setting(&format!("speaker_embeddings:{}", m.id)).ok().flatten();
                     let e = emb.and_then(|m| m.get("Speaker 1").cloned());
                     match state.store.rename_speaker(&m.id, "Speaker 1", &name, e.as_deref()) {
-                        Ok(sp) => println!("SMOKE renamed Speaker 1 -> {} (embedding dims {})", sp.name, sp.embedding.len()),
+                        Ok(o) => println!("SMOKE renamed Speaker 1 -> {} (embedding dims {})", o.name, o.speaker.map(|s| s.embedding.len()).unwrap_or(0)),
                         Err(e) => println!("SMOKE rename failed: {e}"),
                     }
                 }

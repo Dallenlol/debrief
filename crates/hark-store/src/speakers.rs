@@ -12,6 +12,31 @@ pub struct Speaker {
     pub embedding: Vec<f32>,
 }
 
+/// How much one speaker label actually says in a meeting, for the speaker list.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct SpeakerStat {
+    pub label: String,
+    pub segments: i64,
+    /// Total speaking time in milliseconds.
+    pub ms: i64,
+    pub first_ms: i64,
+}
+
+/// What a rename actually did, so the UI can say "merged" rather than "renamed".
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct RenameOutcome {
+    /// The person this label now belongs to. `None` when the label is still a
+    /// placeholder ("Speaker 2"), which is not worth remembering as a person.
+    pub speaker: Option<Speaker>,
+    /// The label every affected segment now carries.
+    pub name: String,
+    /// The label that disappeared, when the new name already labelled other
+    /// segments in this meeting (i.e. two detected voices became one person).
+    pub merged_from: Option<String>,
+    /// Segments that changed label.
+    pub moved_segments: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MeetingSpeaker {
     pub meeting_id: String,
@@ -25,6 +50,15 @@ pub struct MeetingSpeaker {
 
 fn blob(v: &[f32]) -> Vec<u8> {
     v.iter().flat_map(|f| f.to_le_bytes()).collect()
+}
+
+/// "Speaker 1", "Speaker 12" - a diarization placeholder, not someone's name.
+pub fn is_placeholder(name: &str) -> bool {
+    let rest = match name.trim().strip_prefix("Speaker ").or_else(|| name.trim().strip_prefix("speaker ")) {
+        Some(r) => r.trim(),
+        None => return false,
+    };
+    !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
 }
 
 fn unblob(b: &[u8]) -> Vec<f32> {
@@ -95,8 +129,13 @@ impl Store {
     /// Rename a speaker label everywhere in one meeting and link it to a known
     /// speaker (created if no speaker with `name` exists). `embedding` (if given)
     /// becomes / refreshes that speaker's voiceprint.
-    pub fn rename_speaker(&self, meeting_id: &str, label: &str, name: &str, embedding: Option<&[f32]>) -> Result<Speaker> {
+    /// Naming a label the same as another label in the meeting merges the two:
+    /// every segment ends up under one name and one `meeting_speakers` row.
+    pub fn rename_speaker(&self, meeting_id: &str, label: &str, name: &str, embedding: Option<&[f32]>) -> Result<RenameOutcome> {
         let name = name.trim();
+        if name.is_empty() {
+            return Err(crate::StoreError::Other("name cannot be empty".into()));
+        }
         let mut conn = self.conn.lock();
         let tx = conn.transaction()?;
         let existing: Option<(String, String, Vec<u8>)> = tx
@@ -106,7 +145,12 @@ impl Store {
             .optional()?;
         // Reuse the canonical spelling of an existing speaker.
         let name: &str = existing.as_ref().map(|e| e.1.as_str()).unwrap_or(name);
-        let speaker = match existing.clone() {
+        // Merging into a still-unnamed row is fine, but "Speaker 2" is not a person:
+        // rewrite the labels without teaching voice memory a bogus name.
+        let speaker = if is_placeholder(name) {
+            None
+        } else {
+            Some(match existing.clone() {
             Some((id, _, old)) => {
                 let emb = match embedding {
                     Some(e) if !e.is_empty() => {
@@ -131,16 +175,45 @@ impl Store {
                 )?;
                 s
             }
+            })
         };
+        let moved_segments: i64 =
+            tx.query_row("SELECT COUNT(*) FROM segments WHERE meeting_id = ?1 AND speaker = ?2", params![meeting_id, label], |r| r.get(0))?;
+        // Does the target name already label other segments here? Then this is a merge.
+        let target_segments: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM segments WHERE meeting_id = ?1 AND speaker = ?2 COLLATE NOCASE AND speaker <> ?3",
+            params![meeting_id, name, label],
+            |r| r.get(0),
+        )?;
+        let merged_from = (target_segments > 0 && !label.eq_ignore_ascii_case(name)).then(|| label.to_string());
         tx.execute("UPDATE segments SET speaker = ?3 WHERE meeting_id = ?1 AND speaker = ?2", params![meeting_id, label, name])?;
+        // A merge can leave the target under a different spelling; normalise it.
+        tx.execute(
+            "UPDATE segments SET speaker = ?2 WHERE meeting_id = ?1 AND speaker = ?2 COLLATE NOCASE AND speaker <> ?2",
+            params![meeting_id, name],
+        )?;
         tx.execute(
             "INSERT INTO meeting_speakers(meeting_id, label, speaker_id) VALUES (?1, ?3, ?2)
              ON CONFLICT(meeting_id, label) DO UPDATE SET speaker_id = excluded.speaker_id, suggested_id = NULL, suggested_score = NULL",
-            params![meeting_id, speaker.id, name],
+            params![meeting_id, speaker.as_ref().map(|s| s.id.clone()), name],
         )?;
         tx.execute("DELETE FROM meeting_speakers WHERE meeting_id = ?1 AND label = ?2 AND label <> ?3", params![meeting_id, label, name])?;
         tx.commit()?;
-        Ok(speaker)
+        Ok(RenameOutcome { speaker, name: name.to_string(), merged_from, moved_segments })
+    }
+
+    /// Every speaker label in a meeting with how much it says, in first-heard order.
+    pub fn speaker_stats(&self, meeting_id: &str) -> Result<Vec<SpeakerStat>> {
+        let conn = self.conn.lock();
+        let mut st = conn.prepare(
+            "SELECT speaker, COUNT(*), SUM(MAX(end_ms - start_ms, 0)), MIN(start_ms) FROM segments
+             WHERE meeting_id = ?1 AND speaker IS NOT NULL AND TRIM(speaker) <> ''
+             GROUP BY speaker ORDER BY MIN(start_ms)",
+        )?;
+        let rows = st.query_map(params![meeting_id], |r| {
+            Ok(SpeakerStat { label: r.get(0)?, segments: r.get(1)?, ms: r.get(2)?, first_ms: r.get(3)? })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     pub fn set_clean_text(&self, meeting_id: &str, updates: &[(i64, String)]) -> Result<()> {
@@ -192,7 +265,10 @@ mod tests {
         let m = Meeting::new_recording("m", None);
         st.create_meeting(&m).unwrap();
         st.replace_segments(&m.id, &[seg(0, "Speaker 1", "a"), seg(1000, "Speaker 2", "b"), seg(2000, "Speaker 1", "c")]).unwrap();
-        let sp = st.rename_speaker(&m.id, "Speaker 1", "Sarah", Some(&[0.6, 0.8])).unwrap();
+        let out = st.rename_speaker(&m.id, "Speaker 1", "Sarah", Some(&[0.6, 0.8])).unwrap();
+        let sp = out.speaker.expect("named speaker");
+        assert_eq!(out.merged_from, None);
+        assert_eq!(out.moved_segments, 2);
         let segs = st.segments(&m.id).unwrap();
         assert_eq!(segs.iter().filter(|s| s.speaker.as_deref() == Some("Sarah")).count(), 2);
         assert_eq!(segs[1].speaker.as_deref(), Some("Speaker 2"));
@@ -204,12 +280,41 @@ mod tests {
         assert_eq!(ms[0].label, "Sarah");
         assert_eq!(ms[0].speaker_id.as_deref(), Some(sp.id.as_str()));
 
-        // Renaming another label to the same name reuses and blends the speaker.
-        st.rename_speaker(&m.id, "Speaker 2", "sarah", Some(&[1.0, 0.0])).unwrap();
+        // Renaming another label to the same name merges the two and blends the voiceprint.
+        let merge = st.rename_speaker(&m.id, "Speaker 2", "sarah", Some(&[1.0, 0.0])).unwrap();
+        assert_eq!(merge.merged_from.as_deref(), Some("Speaker 2"));
+        assert_eq!(merge.moved_segments, 1);
+        assert_eq!(merge.speaker.as_ref().unwrap().name, "Sarah");
+        assert_eq!(st.meeting_speakers(&m.id).unwrap().len(), 1);
+        let stats = st.speaker_stats(&m.id).unwrap();
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].label, "Sarah");
+        assert_eq!(stats[0].segments, 3);
         let known = st.list_speakers().unwrap();
         assert_eq!(known.len(), 1);
         assert_eq!(known[0].embedding, vec![0.8, 0.4]);
         assert!(st.segments(&m.id).unwrap().iter().all(|s| s.speaker.as_deref() == Some("Sarah")));
+    }
+
+    #[test]
+    fn merging_into_a_placeholder_does_not_create_a_known_speaker() {
+        let st = Store::open_in_memory().unwrap();
+        let m = Meeting::new_recording("m", None);
+        st.create_meeting(&m).unwrap();
+        st.replace_segments(&m.id, &[seg(0, "Speaker 1", "a"), seg(1000, "Speaker 2", "b"), seg(2000, "Speaker 2", "c")]).unwrap();
+        let out = st.rename_speaker(&m.id, "Speaker 2", "Speaker 1", Some(&[1.0, 0.0])).unwrap();
+        assert!(out.speaker.is_none());
+        assert_eq!(out.merged_from.as_deref(), Some("Speaker 2"));
+        assert_eq!(out.moved_segments, 2);
+        assert!(st.list_speakers().unwrap().is_empty(), "placeholders never become known people");
+        let stats = st.speaker_stats(&m.id).unwrap();
+        assert_eq!(stats.len(), 1);
+        assert_eq!((stats[0].label.as_str(), stats[0].segments), ("Speaker 1", 3));
+        // Naming the merged row afterwards still works and remembers one person.
+        let named = st.rename_speaker(&m.id, "Speaker 1", "Ann", Some(&[0.0, 1.0])).unwrap();
+        assert_eq!(named.speaker.unwrap().name, "Ann");
+        assert_eq!(st.list_speakers().unwrap().len(), 1);
+        assert!(is_placeholder("Speaker 12") && !is_placeholder("Speaker Ann") && !is_placeholder("Ann"));
     }
 
     #[test]

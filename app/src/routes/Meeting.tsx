@@ -7,6 +7,7 @@ import { LiveNotes, LiveTranscript, useLiveFeed } from "@/components/LiveView";
 import { Markdown } from "@/components/Markdown";
 import { Player, type PlayerHandle } from "@/components/Player";
 import { ShareDialog } from "@/components/ShareDialog";
+import { SpeakersPanel } from "@/components/SpeakersPanel";
 import { Transcript } from "@/components/Transcript";
 import { Badge, Button, Input, Menu, SectionTitle, Spinner } from "@/components/ui";
 import { safeFileName, transcriptMd, transcriptSrt, transcriptTxt } from "@/lib/export";
@@ -358,6 +359,17 @@ export function MeetingPage() {
             </div>
           ) : (
             <Player ref={player} audio={detail.media.audio} video={detail.media.video} highlights={detail.highlights} onTime={onTime} />
+          )}
+          {!recording && detail.speaker_stats.length > 0 && (
+            <SpeakersPanel
+              className="mt-6"
+              stats={detail.speaker_stats}
+              speakers={speakers}
+              nameOptions={nameOptions}
+              onRename={renameSpeaker}
+              onAcceptSuggestion={acceptSuggestion}
+              onDismissSuggestion={(label) => setDismissed((d) => [...d, label])}
+            />
           )}
           {detail.highlights.length > 0 && (
             <div className="mt-6">

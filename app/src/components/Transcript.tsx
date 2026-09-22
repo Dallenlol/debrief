@@ -19,7 +19,7 @@ export interface TranscriptProps {
   onDismissSuggestion?: (label: string) => void;
 }
 
-const SPEAKER_COLORS = ["text-ember", "text-moss", "text-amber", "text-ink-2"];
+export const SPEAKER_COLORS = ["text-ember", "text-moss", "text-amber", "text-ink-2"];
 
 export function Transcript({
   segments,

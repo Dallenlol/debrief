@@ -152,7 +152,8 @@ impl AppState {
     pub fn llm(&self) -> Option<Arc<dyn LlmBackend>> {
         let s = self.settings.read().clone();
         let tier = s.tier(&self.hardware);
-        let (_, _, llm_id) = s.model_ids(&self.catalog, tier);
+        let (_, _, configured) = s.model_ids(&self.catalog, tier);
+        let llm_id = if s.llm_backend == "openai" { configured } else { self.llm_or_any(&configured)? };
         let key = if s.llm_backend == "openai" {
             format!("openai|{}|{}|{}", s.llm_endpoint, s.llm_endpoint_model, s.llm_api_key.is_some())
         } else {
@@ -183,6 +184,40 @@ impl AppState {
         e.llm = Some((key, backend.clone()));
         e.last_used = Some(Instant::now());
         Some(backend)
+    }
+
+    /// `preferred` if its GGUF is downloaded, else the largest downloaded chat model no
+    /// bigger than it (or the smallest one, if all are bigger). Mirrors `whisper_or_any`.
+    fn llm_or_any(&self, preferred: &str) -> Option<String> {
+        if self.model_file(preferred).is_some() {
+            return Some(preferred.to_string());
+        }
+        let dir = self.models_dir();
+        let want = self.catalog.get(preferred).map(|m| m.size_bytes).unwrap_or(u64::MAX);
+        let mut present: Vec<&hark_models::ModelSpec> = self
+            .catalog
+            .all()
+            .iter()
+            .filter(|m| m.kind == hark_models::ModelKind::Llm && hark_models::is_present(&dir, m))
+            .collect();
+        present.sort_by_key(|m| std::cmp::Reverse(m.size_bytes));
+        let pick = present.iter().find(|m| m.size_bytes <= want).or(present.last()).map(|m| m.id.clone());
+        let missing = match self.catalog.get(preferred) {
+            Some(spec) => format!("llm {preferred} not downloaded (expected {} bytes at {})", spec.size_bytes, hark_models::model_path(&dir, spec).display()),
+            None => format!("llm {preferred} is not in the model catalog"),
+        };
+        let msg = match &pick {
+            Some(id) => format!("{missing}; using downloaded {id}"),
+            None => format!("{missing}; no chat model downloaded in {}", dir.display()),
+        };
+        // Every AI request lands here (live notes poll it), so log only when the outcome changes.
+        static LOGGED: Mutex<String> = Mutex::new(String::new());
+        let mut logged = LOGGED.lock();
+        if *logged != msg {
+            log::warn!("{msg}");
+            *logged = msg;
+        }
+        pick
     }
 
     /// The embedding model for semantic search, if downloaded.

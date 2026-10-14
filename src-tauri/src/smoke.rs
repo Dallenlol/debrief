@@ -22,6 +22,20 @@ pub fn run(app: AppHandle) {
 
 fn smoke(app: &AppHandle) -> Result<(), String> {
     std::thread::sleep(Duration::from_secs(2));
+    // HARK_SMOKE_SUMMARIZE=<id>[,<id>...]: re-run the summary for existing meetings instead of recording.
+    if let Ok(ids) = std::env::var("HARK_SMOKE_SUMMARIZE") {
+        let state = app.state::<AppState>();
+        for id in ids.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let started = Instant::now();
+            crate::summary_stage::run_summary(app, id, None);
+            let s = state.store.get_summary(id).map_err(|e| e.to_string())?.ok_or(format!("no summary for {id}"))?;
+            println!("SMOKE summary {id} ({}, {:.0}s):", s.model, started.elapsed().as_secs_f32());
+            for l in s.markdown.lines().take(14) {
+                println!("  | {l}");
+            }
+        }
+        return Ok(());
+    }
     let video = std::env::var("HARK_SMOKE_VIDEO").map(|v| v == "1").unwrap_or(false);
     log::info!("SMOKE: calling recorder::start");
     let m = recorder::start(app, StartOptions { title: Some("Smoke test".into()), app: None, video: Some(video), target: None, audio_pid: None })?;

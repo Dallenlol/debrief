@@ -147,17 +147,19 @@ impl AppState {
         Some((self.model_file("pyannote-seg-3")?, self.model_file("titanet-small")?))
     }
 
-    /// The configured chat model: bundled llama.cpp (if the GGUF is downloaded)
-    /// or an OpenAI-compatible endpoint. `None` when unavailable.
+    /// The configured chat model: bundled llama.cpp (if the GGUF is downloaded), a cloud
+    /// model (with the local one as fallback) or an OpenAI-compatible endpoint. `None` when unavailable.
     pub fn llm(&self) -> Option<Arc<dyn LlmBackend>> {
         let s = self.settings.read().clone();
-        let tier = s.tier(&self.hardware);
-        let (_, _, configured) = s.model_ids(&self.catalog, tier);
-        let llm_id = if s.llm_backend == "openai" { configured } else { self.llm_or_any(&configured)? };
-        let key = if s.llm_backend == "openai" {
-            format!("openai|{}|{}|{}", s.llm_endpoint, s.llm_endpoint_model, s.llm_api_key.is_some())
-        } else {
-            format!("bundled|{llm_id}")
+        let cloud = (s.llm_backend == "cloud").then(|| cloud_backend(&s)).flatten();
+        let key = match (&cloud, s.llm_backend.as_str()) {
+            (Some(_), _) => format!("cloud|{}|{}|{}|{:?}", s.cloud_provider, s.cloud_model, secret_tag(s.cloud_api_key.as_deref()), s.cloud_context_tokens),
+            (None, "openai") => format!("openai|{}|{}|{}", s.llm_endpoint, s.llm_endpoint_model, secret_tag(s.llm_api_key.as_deref())),
+            _ => {
+                let tier = s.tier(&self.hardware);
+                let (_, _, configured) = s.model_ids(&self.catalog, tier);
+                format!("bundled|{}", self.llm_or_any(&configured)?)
+            }
         };
         {
             let mut e = self.engines.lock();
@@ -167,15 +169,23 @@ impl AppState {
                 return Some(b);
             }
         }
-        let backend: Arc<dyn LlmBackend> = if s.llm_backend == "openai" {
+        let backend: Arc<dyn LlmBackend> = if let Some(primary) = cloud {
+            let local = self.local_llm_spec();
+            Arc::new(hark_llm::WithFallback::new(
+                primary,
+                Box::new(move || {
+                    let (path, gpu_layers, n_ctx) = local.clone()?;
+                    hark_llm::LlamaEngine::load(&path, gpu_layers, n_ctx).map(|e| Arc::new(e) as Arc<dyn LlmBackend>).map_err(|e| log::error!("fallback llm: {e}")).ok()
+                }),
+            ))
+        } else if s.llm_backend == "openai" {
             Arc::new(hark_llm::OpenAiCompat::new(&s.llm_endpoint, s.llm_api_key.as_deref(), &s.llm_endpoint_model))
         } else {
-            let path = self.model_file(&llm_id)?;
-            let gpu_layers = if self.hardware.gpu.is_some() { 999 } else { 0 };
-            match hark_llm::LlamaEngine::load(&path, gpu_layers, 8192) {
+            let (path, gpu_layers, n_ctx) = self.local_llm_spec()?;
+            match hark_llm::LlamaEngine::load(&path, gpu_layers, n_ctx) {
                 Ok(e) => Arc::new(e),
                 Err(err) => {
-                    log::error!("load llm {llm_id}: {err}");
+                    log::error!("load llm {}: {err}", path.display());
                     return None;
                 }
             }
@@ -184,6 +194,16 @@ impl AppState {
         e.llm = Some((key, backend.clone()));
         e.last_used = Some(Instant::now());
         Some(backend)
+    }
+
+    /// GGUF path, GPU layers and context cap for the local chat model, if one is downloaded.
+    fn local_llm_spec(&self) -> Option<(PathBuf, u32, u32)> {
+        let s = self.settings.read().clone();
+        let (_, _, configured) = s.model_ids(&self.catalog, s.tier(&self.hardware));
+        let path = self.model_file(&self.llm_or_any(&configured)?)?;
+        let gpu = crate::settings::GPU_BUILD && self.hardware.gpu.is_some();
+        // A context is only sized this large when a prompt needs it (llama.rs sizes per request).
+        Some((path, if gpu { 999 } else { 0 }, if gpu { 32_768 } else { 12_288 }))
     }
 
     /// `preferred` if its GGUF is downloaded, else the largest downloaded chat model no
@@ -292,5 +312,34 @@ impl Drop for BusyGuard<'_> {
     fn drop(&mut self) {
         self.0.busy.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         self.0.engines.lock().last_used = Some(Instant::now());
+    }
+}
+
+/// Cache-key tag for a secret: changes when the key changes, without keeping it in the key.
+fn secret_tag(k: Option<&str>) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    k.hash(&mut h);
+    h.finish()
+}
+
+pub const OPENAI_BASE: &str = "https://api.openai.com/v1";
+pub const OPENROUTER_BASE: &str = "https://openrouter.ai/api/v1";
+
+/// The cloud model the settings describe, or `None` when the key or model is missing.
+pub fn cloud_backend(s: &Settings) -> Option<Arc<dyn LlmBackend>> {
+    let key = s.cloud_api_key.as_deref().map(str::trim).filter(|k| !k.is_empty())?;
+    let ctx = s.cloud_context_tokens.map(|c| c as usize);
+    match s.cloud_provider.as_str() {
+        "anthropic" => Some(Arc::new(hark_llm::AnthropicApi::new(key, &s.cloud_model, ctx))),
+        p @ ("openai" | "openrouter") => {
+            let model = s.cloud_model.trim();
+            if model.is_empty() {
+                return None;
+            }
+            let base = if p == "openai" { OPENAI_BASE } else { OPENROUTER_BASE };
+            Some(Arc::new(hark_llm::OpenAiCompat::new(base, Some(key), model).with_context(ctx.unwrap_or(128_000))))
+        }
+        _ => None,
     }
 }

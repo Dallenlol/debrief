@@ -1,4 +1,4 @@
-//! "Ask Hark": build a grounded prompt from retrieved transcript chunks and
+//! "Ask Debrief": build a grounded prompt from retrieved transcript chunks and
 //! parse the `[m:ss]` citations the model emits.
 
 use crate::backend::{ChatMessage, Role};
@@ -23,13 +23,51 @@ pub struct Citation {
     pub label: String,
 }
 
-pub const CHAT_SYSTEM: &str = "You are Hark, a private assistant that answers questions about the user's recorded meetings.\n\
-Answer only from the transcript passages provided. If the passages do not contain the answer, say so plainly and do not guess.\n\
-Be concise and direct, and answer in the language the question is asked in. When you rely on a passage, cite it with its timestamp in square brackets exactly as shown in the passage header, e.g. [12:34]. \
-When passages come from several meetings, cite as [12:34 @ Meeting title]. Do not invent timestamps.";
+pub const CHAT_SYSTEM: &str = "You are Debrief, a private assistant that answers questions about the user's recorded meetings.
+Answer from the transcript material provided below. It is either the whole transcript, the most relevant excerpts, or notes extracted from every part of the meeting; the header says which. Use all of it: when asked for a list, collect every matching item from the whole material rather than stopping at the first few. If the material genuinely does not cover the question, say what it does cover instead of guessing.
+Be direct, and answer in the language the question is asked in. When you rely on a passage, cite it with its timestamp in square brackets exactly as shown, e.g. [12:34]. When passages come from several meetings, cite as [12:34 @ Meeting title]. Do not invent timestamps.";
+
+/// Instruction for one part of a long meeting when it does not fit the model at once.
+pub const EXTRACT_SYSTEM: &str = "You read one part of a meeting transcript and pull out everything relevant to the user's question. Reply with a bullet list; start each bullet with the timestamp of the line it comes from, e.g. [12:34], and keep the speaker's meaning. Include every relevant item, even small ones. If nothing in this part is relevant, reply with exactly NONE.";
+
+/// Questions about the meeting as a whole ("list every change", "summarise") need all of it,
+/// not the few best-matching excerpts.
+pub fn is_global(question: &str) -> bool {
+    let q = question.to_lowercase();
+    const CUES: [&str; 22] = [
+        "every", "all ", "all the", "list", "each", "summar", "overall", "throughout", "whole", "entire", "how many", "what were",
+        "what are the", "action item", "decision", "takeaway", "next step", "recap", "everything", "key point", "main point", "follow up",
+    ];
+    CUES.iter().any(|c| q.contains(c))
+}
+
+/// Messages for the map step over one block of transcript.
+pub fn extract_messages(question: &str, block: &str) -> Vec<ChatMessage> {
+    vec![ChatMessage::system(EXTRACT_SYSTEM), ChatMessage::user(format!("Question: {question}\n\nTranscript part:\n{block}"))]
+}
+
+/// Header line for the material block, so the model knows how complete it is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Material {
+    Full,
+    Excerpts,
+    Extracts,
+}
 
 /// Assemble system + context + prior turns + question.
 pub fn build_messages(question: &str, history: &[(Role, String)], passages: &[Passage], multi_meeting: bool) -> Vec<ChatMessage> {
+    build_messages_with(question, history, passages, multi_meeting, Material::Excerpts, None)
+}
+
+/// As [`build_messages`], saying how complete the material is and adding the meeting summary.
+pub fn build_messages_with(
+    question: &str,
+    history: &[(Role, String)],
+    passages: &[Passage],
+    multi_meeting: bool,
+    material: Material,
+    summary: Option<&str>,
+) -> Vec<ChatMessage> {
     let mut context = String::new();
     for (i, p) in passages.iter().enumerate() {
         let head = if multi_meeting {
@@ -42,7 +80,13 @@ pub fn build_messages(question: &str, history: &[(Role, String)], passages: &[Pa
     if context.is_empty() {
         context.push_str("(no matching passages were found)\n");
     }
-    let mut msgs = vec![ChatMessage::system(format!("{CHAT_SYSTEM}\n\nTranscript passages:\n{context}"))];
+    let head = match material {
+        Material::Full => "The complete transcript, in order",
+        Material::Excerpts => "Excerpts that best match the question (not the whole meeting)",
+        Material::Extracts => "Notes extracted from every part of the meeting for this question",
+    };
+    let summary = summary.filter(|s| !s.trim().is_empty()).map(|s| format!("Meeting summary:\n{}\n\n", s.trim())).unwrap_or_default();
+    let mut msgs = vec![ChatMessage::system(format!("{CHAT_SYSTEM}\n\n{summary}{head}:\n{context}"))];
     for (role, content) in history.iter().rev().take(8).rev() {
         msgs.push(ChatMessage { role: *role, content: content.clone() });
     }

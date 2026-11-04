@@ -22,6 +22,7 @@
   --color-ember: var(--ember);
   --color-ember-2: var(--ember-2);
   --color-ember-soft: var(--ember-soft);
+  --color-on-ember: var(--on-ember);
   --color-moss: var(--moss);
   --color-moss-soft: var(--moss-soft);
   --color-amber: var(--amber);
@@ -31,8 +32,8 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
 
-  --shadow-card: 0 1px 2px rgb(20 18 16 / 0.04), 0 8px 24px -12px rgb(20 18 16 / 0.12);
-  --shadow-float: 0 2px 6px rgb(20 18 16 / 0.08), 0 24px 48px -16px rgb(20 18 16 / 0.28);
+  --shadow-card: 0 1px 2px rgb(var(--shade) / 0.04), 0 8px 24px -12px rgb(var(--shade) / 0.12);
+  --shadow-float: 0 2px 6px rgb(var(--shade) / 0.08), 0 24px 48px -16px rgb(var(--shade) / 0.28);
 }
 
 :root {
@@ -41,16 +42,18 @@
   --canvas-3: oklch(0.935 0.01 80);
   --ink: oklch(0.2 0.01 60);
   --ink-2: oklch(0.45 0.012 60);
-  --ink-3: oklch(0.62 0.012 60);
+  --ink-3: oklch(0.53 0.012 60);
   --line: oklch(0.9 0.008 80);
   --line-2: oklch(0.84 0.01 80);
-  --ember: oklch(0.62 0.2 32);
-  --ember-2: oklch(0.55 0.2 32);
+  --ember: oklch(0.57 0.2 32);
+  --ember-2: oklch(0.51 0.2 32);
+  --on-ember: oklch(0.995 0 0);
   --ember-soft: oklch(0.95 0.035 32);
-  --moss: oklch(0.55 0.12 150);
+  --moss: oklch(0.5 0.12 150);
   --moss-soft: oklch(0.95 0.035 150);
   --amber: oklch(0.7 0.15 75);
   --amber-soft: oklch(0.96 0.05 85);
+  --shade: 20 18 16;
   color-scheme: light;
 }
 
@@ -60,16 +63,18 @@
   --canvas-3: oklch(0.26 0.01 60);
   --ink: oklch(0.95 0.006 80);
   --ink-2: oklch(0.72 0.01 80);
-  --ink-3: oklch(0.55 0.01 80);
+  --ink-3: oklch(0.63 0.01 80);
   --line: oklch(0.27 0.01 60);
   --line-2: oklch(0.34 0.012 60);
   --ember: oklch(0.7 0.19 32);
   --ember-2: oklch(0.76 0.18 32);
   --ember-soft: oklch(0.3 0.06 32);
+  --on-ember: oklch(0.17 0.008 60);
   --moss: oklch(0.72 0.12 150);
   --moss-soft: oklch(0.28 0.05 150);
   --amber: oklch(0.8 0.14 80);
   --amber-soft: oklch(0.3 0.06 80);
+  --shade: 0 0 0;
   color-scheme: dark;
 }
 
@@ -98,6 +103,11 @@ body.transparent {
 
 ::selection {
   background: var(--ember-soft);
+  color: var(--ink);
+}
+
+* {
+  caret-color: var(--ember);
 }
 
 /* Subtle paper grain on the canvas. */

@@ -18,15 +18,25 @@ interface PlayerProps {
 }
 
 export const Player = forwardRef<PlayerHandle, PlayerProps>(function Player({ audio, video, highlights = [], onTime, className }, ref) {
-  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [audioFailed, setAudioFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const src = (video ?? audio) ? convertFileSrc(video ?? audio) : undefined;
+  const audioSrc = audio ? convertFileSrc(audio) : undefined;
+  const videoSrc = video ? convertFileSrc(video) : undefined;
+  // mix.wav is the sound of record: the video plays muted and follows it, so a screen
+  // recording that lost its audio track (a failed mux) can never hide good audio.
+  // Only when mix.wav will not load does the video lead with its own track.
+  const videoLeads = !!video && audioFailed;
+  const master = () => (videoLeads ? videoRef.current : audioRef.current);
+
+  useEffect(() => setAudioFailed(false), [audioSrc]);
 
   useImperativeHandle(ref, () => ({
     seek(ms) {
-      const m = mediaRef.current;
+      const m = master();
       if (!m) return;
       m.currentTime = ms / 1000;
       if (m.paused) void m.play();
@@ -34,21 +44,42 @@ export const Player = forwardRef<PlayerHandle, PlayerProps>(function Player({ au
   }));
 
   useEffect(() => {
-    const m = mediaRef.current;
+    const m = videoLeads ? videoRef.current : audioRef.current;
     if (!m) return;
+    const v = videoLeads ? null : videoRef.current;
+    if (v) v.muted = true;
+    if (videoRef.current && videoLeads) videoRef.current.muted = false;
+    const follow = (force: boolean) => {
+      if (v && (force || Math.abs(v.currentTime - m.currentTime) > 0.3)) v.currentTime = m.currentTime;
+    };
     const tick = () => {
       setTime(m.currentTime * 1000);
       onTime(m.currentTime * 1000);
+      follow(false);
     };
     const meta = () => setDuration(isFinite(m.duration) ? m.duration * 1000 : 0);
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
+    const onPlay = () => {
+      setPlaying(true);
+      follow(true);
+      void v?.play().catch(() => undefined);
+    };
+    const onPause = () => {
+      setPlaying(false);
+      v?.pause();
+    };
+    const onSeek = () => follow(true);
+    const onRate = () => {
+      if (v) v.playbackRate = m.playbackRate;
+    };
     m.addEventListener("timeupdate", tick);
     m.addEventListener("loadedmetadata", meta);
     m.addEventListener("durationchange", meta);
     m.addEventListener("play", onPlay);
     m.addEventListener("pause", onPause);
     m.addEventListener("ended", onPause);
+    m.addEventListener("seeking", onSeek);
+    m.addEventListener("ratechange", onRate);
+    meta();
     return () => {
       m.removeEventListener("timeupdate", tick);
       m.removeEventListener("loadedmetadata", meta);
@@ -56,21 +87,23 @@ export const Player = forwardRef<PlayerHandle, PlayerProps>(function Player({ au
       m.removeEventListener("play", onPlay);
       m.removeEventListener("pause", onPause);
       m.removeEventListener("ended", onPause);
+      m.removeEventListener("seeking", onSeek);
+      m.removeEventListener("ratechange", onRate);
     };
-  }, [src, onTime]);
+  }, [audioSrc, videoSrc, videoLeads, onTime]);
 
   const toggle = () => {
-    const m = mediaRef.current;
+    const m = master();
     if (!m) return;
     if (m.paused) void m.play();
     else m.pause();
   };
   const skip = (s: number) => {
-    const m = mediaRef.current;
+    const m = master();
     if (m) m.currentTime = Math.max(0, m.currentTime + s);
   };
   const scrub = (e: React.MouseEvent<HTMLDivElement>) => {
-    const m = mediaRef.current;
+    const m = master();
     if (!m || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = (e.clientX - rect.left) / rect.width;
@@ -81,11 +114,11 @@ export const Player = forwardRef<PlayerHandle, PlayerProps>(function Player({ au
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
+      <audio ref={audioRef} src={audioSrc} preload="metadata" onError={() => setAudioFailed(true)} />
       {video ? (
-        <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={src} className="aspect-video w-full rounded-lg bg-black shadow-card" onClick={toggle} />
+        <video ref={videoRef} src={videoSrc} muted={!videoLeads} playsInline preload="auto" className="aspect-video w-full rounded-lg bg-black shadow-card" onClick={toggle} />
       ) : (
         <>
-          <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={src} />
           <div className="flex h-24 items-end justify-center gap-[3px] rounded-lg bg-canvas-2 px-4 pb-4" aria-hidden>
             {Array.from({ length: 64 }).map((_, i) => {
               const seed = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;

@@ -75,7 +75,7 @@ export function RecordBar() {
         </IconBtn>
         <button
           onClick={() => void cmd.stopRecording()}
-          className="focus-ring ml-1 inline-flex h-8 items-center gap-1.5 rounded-md bg-ember px-3 text-[12px] font-semibold text-white hover:bg-ember-2"
+          className="focus-ring ml-1 inline-flex h-8 items-center gap-1.5 rounded-md bg-ember px-3 text-[12px] font-semibold text-on-ember hover:bg-ember-2"
         >
           <Square size={11} fill="currentColor" /> Stop
         </button>

@@ -55,7 +55,7 @@ fn post<T: Serialize>(url: &str, body: &T) -> Result<u16, String> {
         return Err("webhook URL must start with http:// or https://".into());
     }
     let client = reqwest::blocking::Client::builder()
-        .user_agent(concat!("Hark/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Debrief/", env!("CARGO_PKG_VERSION")))
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| e.to_string())?;

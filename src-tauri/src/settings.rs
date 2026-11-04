@@ -31,8 +31,16 @@ pub struct Settings {
     pub never_apps: Vec<String>,
     pub popup_timeout_secs: u64,
     pub close_to_tray: bool,
-    /// "bundled" (llama.cpp in-process) or "openai" (any OpenAI-compatible endpoint).
+    /// "bundled" (llama.cpp in-process), "cloud" (Claude / OpenAI / OpenRouter with the
+    /// user's key, local model as fallback) or "openai" (an OpenAI-compatible endpoint they run).
     pub llm_backend: String,
+    /// "anthropic", "openai" or "openrouter".
+    pub cloud_provider: String,
+    pub cloud_api_key: Option<String>,
+    /// Model id at the provider; empty = the provider's default.
+    pub cloud_model: String,
+    /// The chosen model's context window when the provider reported it.
+    pub cloud_context_tokens: Option<u32>,
     pub llm_endpoint: String,
     pub llm_endpoint_model: String,
     pub llm_api_key: Option<String>,
@@ -78,6 +86,10 @@ impl Default for Settings {
             llm_endpoint: "http://localhost:11434/v1".into(),
             llm_endpoint_model: "qwen3:8b".into(),
             llm_api_key: None,
+            cloud_provider: "anthropic".into(),
+            cloud_api_key: None,
+            cloud_model: String::new(),
+            cloud_context_tokens: None,
             cleanup_enabled: true,
             diarize_enabled: true,
             summary_enabled: true,

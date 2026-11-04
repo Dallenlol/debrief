@@ -6,7 +6,7 @@ use crate::state::AppState;
 use hark_capture::video::run_ffmpeg;
 use hark_store::{Meeting, MeetingStatus};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use tauri::{AppHandle, Manager};
 
 /// Title for an imported file: the file stem with separators turned into spaces.
@@ -40,7 +40,7 @@ pub fn ffmpeg_video_args(input: &Path, out: &Path) -> Vec<String> {
 
 fn has_video_stream(ffmpeg: &Path, input: &Path) -> bool {
     // `ffmpeg -i` with no output exits 1 but prints the stream list to stderr.
-    let Ok(out) = Command::new(ffmpeg).args(["-hide_banner", "-i"]).arg(input).stdin(Stdio::null()).output() else { return false };
+    let Ok(out) = hark_capture::hidden_command(ffmpeg).args(["-hide_banner", "-i"]).arg(input).stdin(Stdio::null()).output() else { return false };
     let err = String::from_utf8_lossy(&out.stderr);
     err.lines().any(|l| l.contains("Video:") && !l.contains("attached pic"))
 }

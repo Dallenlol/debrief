@@ -8,7 +8,7 @@ const button = cva(
     variants: {
       variant: {
         primary: "bg-ink text-canvas hover:bg-ink/90 shadow-card",
-        ember: "bg-ember text-white hover:bg-ember-2 shadow-card",
+        ember: "bg-ember text-on-ember hover:bg-ember-2 shadow-card",
         soft: "bg-canvas-3 text-ink hover:bg-line-2",
         ghost: "text-ink-2 hover:bg-canvas-3 hover:text-ink",
         outline: "border border-line-2 bg-canvas text-ink hover:bg-canvas-2",

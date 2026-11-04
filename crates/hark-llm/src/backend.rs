@@ -69,6 +69,10 @@ pub trait LlmBackend: Send + Sync {
     /// `false` to cancel. The full reply is returned on success.
     fn chat(&self, msgs: &[ChatMessage], opts: &GenOptions, on_token: &mut dyn FnMut(&str) -> bool) -> Result<String, LlmError>;
     fn name(&self) -> String;
+    /// How many tokens of prompt + reply the model takes; callers size the transcript to it.
+    fn context_tokens(&self) -> usize {
+        8192
+    }
 }
 
 /// Convenience: run to completion without streaming.

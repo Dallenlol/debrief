@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Hark is now Debrief.** New name, new mark (a level-meter bar as the spine of a D, its bowl in ember), `debrief.exe`, `.debrief` bundles (old `.hark` bundles still import). The data folder moves from `%APPDATA%\Hark` to `%APPDATA%\Debrief` on first start, custom data folders included.
+- **Screen recordings show the screen.** Window capture used GDI, which returns black frames for anything the GPU draws (browsers, Zoom, Teams, Electron) - videos were black with only the cursor. It now uses Windows Graphics Capture by window handle, falls back to the main screen when a window cannot be captured, and keeps frame sizes even so odd-sized windows encode.
+- **No more terminal windows.** ffmpeg and the speaker-detection sidecar start without a console window.
+- **Live transcript keeps up.** Captions never run more than ~45 s behind on slow machines (the full transcript after the call covers anything skipped), refinement passes are skipped while catching up, and short clips encode only the audio they contain on a CPU. When you stop, the live lines show as the transcript straight away until the speaker-labelled version replaces them.
+- **Cloud AI.** Settings > AI assistant > Cloud AI: Claude (native Messages API), OpenAI or OpenRouter with your own key, with a model picker. Summaries, titles, follow-ups, clean-up and Ask all use it; the local model answers when the cloud call fails.
+- **Ask about the whole meeting.** Ask sends the entire transcript (and the summary) when it fits the model; on long calls with a smaller model, whole-meeting questions ("list every change they asked for") read the meeting part by part and answer from every part. Excerpt answers no longer say "the passage does not contain...".
+- **Export the call audio as MP3** (Share > Export > Audio), with the transcript as a .txt beside it.
+- **Names from the screen.** While recording video, Windows' built-in OCR reads the name labels on video tiles; names seen in two frames join the meeting's participants, feed the speaker-name suggestions, and cap how many voices speaker detection may split the call into.
+- **Light and dark themes**, switchable from the sidebar or Settings > Appearance; secondary text and the accent button now meet 4.5:1 contrast in both.
+
 ## 0.4.0 - 2026-09-22
 
 - **A real app icon.** Hark ships with its own mark - two level-meter bars standing as the stems of an H, crossed in ember - instead of the default purple square, on Windows, macOS, the tray, the site and the favicon. `scripts/make-icons.py` redraws every size from one source.

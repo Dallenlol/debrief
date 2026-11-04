@@ -22,7 +22,7 @@ const UI_WORDS: &[&str] = &[
     "guest", "organizer", "attendee", "presenter", "speaking", "talking", "typing", "is", "are", "and", "the",
     "in", "of", "to", "for", "with", "from", "your", "this", "that", "all", "none", "voice", "channel", "server",
     "text", "friends", "direct", "messages", "inbox", "home", "library", "calendar", "files", "activity", "mail",
-    "gemini", "companion", "ai", "assistant", "notetaker", "recorder", "otter", "fathom", "hark", "fireflies",
+    "gemini", "companion", "ai", "assistant", "notetaker", "recorder", "otter", "fathom", "hark", "debrief", "fireflies",
 ];
 
 /// Suffixes the apps append to a name: "(Host, me)", ", Muted", "is presenting" ...

@@ -330,7 +330,7 @@ export function MeetingPage() {
           <div className="min-w-0 flex-1">
             <div className="font-medium text-ink">{m.status === "failed" ? "Processing failed" : "One step had a problem"}</div>
             <div className="mt-0.5 break-words text-ink-2">{m.error ?? "Unknown error"}</div>
-            <div className="mt-1 text-[12px] text-ink-3">Logs are in the Hark data folder under <code>logs/</code>. Missing models can be downloaded in Settings.</div>
+            <div className="mt-1 text-[12px] text-ink-3">Logs are in the Debrief data folder under <code>logs/</code>. Missing models can be downloaded in Settings.</div>
           </div>
           <Button variant="outline" size="sm" onClick={() => void cmd.retranscribe(m.id)}>
             <RefreshCw size={14} /> Retry
@@ -350,7 +350,7 @@ export function MeetingPage() {
           {recording ? (
             <div className="rounded-lg border border-line bg-canvas-2 p-5">
               <div className="inline-flex items-center gap-2 text-[13px] font-medium text-ember"><span className="h-2 w-2 animate-pulse rounded-full bg-ember" /> Recording in progress</div>
-              <p className="mt-2 text-[13px] text-ink-2">Captions and notes update as people talk. The full transcript with speaker names, the summary and Ask Hark arrive once you stop.</p>
+              <p className="mt-2 text-[13px] text-ink-2">Captions and notes update as people talk. The full transcript with speaker names, the summary and Ask Debrief arrive once you stop.</p>
               {stopping ? (
                 <div className="mt-4 inline-flex items-center gap-2 text-[13px] text-ink-2"><Spinner className="h-3.5 w-3.5" /> Finishing the recording...</div>
               ) : (
@@ -415,7 +415,7 @@ export function MeetingPage() {
           {tab === "transcript" && recording && <LiveTranscript finals={live?.finals ?? []} partial={live?.partial ?? null} />}
           {tab === "summary" && recording && <LiveNotes notes={live?.notes ?? ""} updatedMs={live?.notes_updated_ms ?? null} />}
           {tab === "chat" && recording && (
-            <p className="text-sm text-ink-3">Ask Hark opens once the recording stops and the transcript is ready.</p>
+            <p className="text-sm text-ink-3">Ask Debrief opens once the recording stops and the transcript is ready.</p>
           )}
 
           {tab === "transcript" && !recording && (
@@ -426,6 +426,12 @@ export function MeetingPage() {
                 No transcript. Download a speech model in <Link to="/settings" className="underline">Settings</Link>, then Re-transcribe.
               </p>
             ) : (
+              <>
+              {processing && (
+                <p className="mb-3 rounded-lg bg-canvas-2 px-3 py-2 text-[12px] text-ink-3">
+                  This is the live transcript. A cleaner version with speaker names replaces it in a few minutes.
+                </p>
+              )}
               <Transcript
                 segments={detail.segments}
                 currentMs={currentMs}
@@ -437,6 +443,7 @@ export function MeetingPage() {
                 onAcceptSuggestion={acceptSuggestion}
                 onDismissSuggestion={(label) => setDismissed((d) => [...d, label])}
               />
+              </>
             )
           )}
 

@@ -1,6 +1,6 @@
-# Contributing to Hark
+# Contributing to Debrief
 
-Thanks for helping. Hark is small on purpose; the best contributions keep it that way.
+Thanks for helping. Debrief is small on purpose; the best contributions keep it that way.
 
 ## Ground rules
 

@@ -100,6 +100,7 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
                 match VideoRecorder::start(ffmpeg, &target, &dir.join("screen.raw.mp4"), settings.video_fps, settings.video_max_height) {
                     Ok(v) => {
                         meeting.has_video = true;
+                        spawn_screen_name_reader(app.clone(), meeting.id.clone(), ffmpeg.clone(), target.clone(), dir.clone());
                         Some(v)
                     }
                     Err(e) => {
@@ -241,10 +242,10 @@ fn reopen_streams(app: &AppHandle, mic: bool, sys: bool) {
     let Some(rec) = active.recorder.as_mut() else { return };
     log::warn!("capture stalled (mic={mic}, sys={sys}); reopening audio devices");
     match rec.reopen() {
-        Ok(()) => notice(app, "warning", "Audio device changed - Hark switched to the current one and is still recording.".into()),
+        Ok(()) => notice(app, "warning", "Audio device changed - Debrief switched to the current one and is still recording.".into()),
         Err(e) => {
             log::error!("reopen audio: {e}");
-            notice(app, "error", format!("Audio device lost ({e}). Hark keeps trying; stop the recording to keep what was captured."));
+            notice(app, "error", format!("Audio device lost ({e}). Debrief keeps trying; stop the recording to keep what was captured."));
         }
     }
 }
@@ -313,25 +314,69 @@ fn spawn_participant_sampler(app: AppHandle, meeting_id: String, app_id: Option<
             let windows = hark_detect::list_visible_windows();
             let Some(det) = patterns.match_windows(&windows).filter(|d| d.app == app_id && d.hwnd != 0) else { continue };
             let raw = hark_detect::scrape_window(det.hwnd);
-            let names = hark_detect::extract_names(&app_id, &raw);
-            if names.is_empty() {
+            merge_participants(&app, &meeting_id, hark_detect::extract_names(&app_id, &raw));
+        }
+    });
+}
+
+/// Add newly seen names to the recording's participants (and tell the UI).
+fn merge_participants(app: &AppHandle, meeting_id: &str, names: Vec<String>) {
+    let state = app.state::<AppState>();
+    let mut merged = state.recording.lock().as_ref().filter(|a| a.meeting.id == meeting_id).map(|a| a.meeting.participants.clone()).unwrap_or_default();
+    let before = merged.len();
+    for n in names {
+        if !merged.iter().any(|m| m.eq_ignore_ascii_case(&n)) {
+            merged.push(n);
+        }
+    }
+    if merged.len() == before {
+        return;
+    }
+    if let Some(a) = state.recording.lock().as_mut().filter(|a| a.meeting.id == meeting_id) {
+        a.meeting.participants = merged.clone();
+    }
+    let _ = state.store.set_participants(meeting_id, &merged);
+    let _ = app.emit(events::PARTICIPANTS, events::ParticipantsPayload { meeting_id: meeting_id.to_string(), participants: merged });
+}
+
+/// Read names off the screen being recorded (video-tile labels) with Windows OCR. A name
+/// counts once it shows up in two different frames, so passing text on a shared screen
+/// rarely gets in.
+fn spawn_screen_name_reader(app: AppHandle, meeting_id: String, ffmpeg: std::path::PathBuf, target: VideoTarget, dir: std::path::PathBuf) {
+    if !cfg!(windows) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let shot = dir.join("names.png");
+        let mut seen: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        let mut wait = 20;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(wait));
+            wait = 45;
+            let state = app.state::<AppState>();
+            let still = state.recording.lock().as_ref().map(|a| a.meeting.id == meeting_id).unwrap_or(false);
+            if !still {
+                break;
+            }
+            if let Err(e) = hark_capture::video::snapshot(&ffmpeg, &target, &shot) {
+                log::debug!("name snapshot: {e}");
                 continue;
             }
-            let mut merged = state.recording.lock().as_ref().map(|a| a.meeting.participants.clone()).unwrap_or_default();
-            let before = merged.len();
+            let names = hark_detect::ocr::names_in_image(&shot);
+            let _ = std::fs::remove_file(&shot);
+            let me = state.settings.read().user_name.trim().to_lowercase();
+            let mut confirmed = Vec::new();
             for n in names {
-                if !merged.iter().any(|m| m.eq_ignore_ascii_case(&n)) {
-                    merged.push(n);
+                let count = seen.entry(n.to_lowercase()).or_insert(0);
+                *count += 1;
+                if *count == 2 && n.to_lowercase() != me {
+                    confirmed.push(n);
                 }
             }
-            if merged.len() == before {
-                continue;
+            if !confirmed.is_empty() {
+                log::info!("names on screen: {confirmed:?}");
+                merge_participants(&app, &meeting_id, confirmed);
             }
-            if let Some(a) = state.recording.lock().as_mut() {
-                a.meeting.participants = merged.clone();
-            }
-            let _ = state.store.set_participants(&meeting_id, &merged);
-            let _ = app.emit(events::PARTICIPANTS, events::ParticipantsPayload { meeting_id: meeting_id.clone(), participants: merged });
         }
     });
 }
@@ -393,6 +438,19 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
     state.store.update_meeting(&meeting).map_err(|e| e.to_string())?;
     if !active.highlights.is_empty() {
         let _ = state.store.set_setting(&format!("highlights:{}", meeting.id), &active.highlights);
+    }
+    // The live captions become the transcript right away; post-processing replaces them
+    // with the higher-quality, speaker-labelled version when it finishes.
+    let finals: Vec<hark_store::NewSegment> = state
+        .live_feed
+        .lock()
+        .as_ref()
+        .map(|f| f.finals.iter().map(|c| hark_store::NewSegment { start_ms: c.start_ms, end_ms: c.end_ms, speaker: None, text: c.text.clone() }).collect())
+        .unwrap_or_default();
+    if !finals.is_empty() {
+        if let Err(e) = state.store.replace_segments(&meeting.id, &finals) {
+            log::warn!("provisional transcript: {e}");
+        }
     }
     crate::live_feed::LiveFeed::end(&state);
     emit_state(app);

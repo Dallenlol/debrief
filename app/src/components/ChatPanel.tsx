@@ -21,6 +21,7 @@ export function ChatPanel({ scopeKind, scopeId = null, onSeek, placeholder, clas
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState<string | null>(null); // assistant message id
+  const [status, setStatus] = useState<string | null>(null); // "Reading part 2 of 6" on long meetings
   const [error, setError] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -49,9 +50,13 @@ export function ChatPanel({ scopeKind, scopeId = null, onSeek, placeholder, clas
       if (p.chat_id !== chatId) return;
       setMessages((ms) => ms.map((m) => (m.id === p.message_id ? { ...m, content: m.content + p.delta } : m)));
     });
+    const c = subscribe("chat_status", (p) => {
+      if (p.chat_id === chatId) setStatus(p.text);
+    });
     const b = subscribe("chat_done", (p) => {
       if (p.chat_id !== chatId) return;
       setStreaming(null);
+      setStatus(null);
       setError(p.error);
       setMessages((ms) => ms.map((m) => (m.id === p.message.id ? p.message : m)));
       void loadChats();
@@ -59,6 +64,7 @@ export function ChatPanel({ scopeKind, scopeId = null, onSeek, placeholder, clas
     return () => {
       a();
       b();
+      c();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
@@ -134,7 +140,10 @@ export function ChatPanel({ scopeKind, scopeId = null, onSeek, placeholder, clas
               {m.role === "user" ? (
                 <p className="text-[14px] leading-6">{m.content}</p>
               ) : m.content === "" && streaming === m.id ? (
-                <Spinner className="my-1" />
+                <span className="flex items-center gap-2 text-[13px] text-ink-3">
+                  <Spinner className="my-1" />
+                  {status}
+                </span>
               ) : (
                 <Markdown text={m.content} onSeek={(ms, label) => onSeek(ms, resolveMeeting(m, label))} />
               )}
@@ -162,7 +171,7 @@ export function ChatPanel({ scopeKind, scopeId = null, onSeek, placeholder, clas
             }
           }}
           rows={1}
-          placeholder="Ask Hark..."
+          placeholder="Ask Debrief..."
           className="max-h-32 min-h-[28px] flex-1 resize-none bg-transparent py-1 text-[14px] outline-none placeholder:text-ink-3"
         />
         {streaming ? (

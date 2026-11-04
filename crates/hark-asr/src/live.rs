@@ -23,6 +23,9 @@ pub const GATE_DB: f32 = -50.0;
 pub const PROMPT_CHARS: usize = 220;
 /// Segments whisper itself thinks are probably not speech.
 pub const NO_SPEECH_MAX: f32 = 0.6;
+/// Live captions never run further behind than this: older unprocessed audio is skipped
+/// (the full transcript after the call still covers it).
+pub const MAX_LAG_S: f32 = 45.0;
 
 pub struct LiveTranscriber {
     handle: Option<JoinHandle<()>>,
@@ -44,12 +47,21 @@ impl LiveTranscriber {
                     while let Ok(more) = rx.try_recv() {
                         merged.extend(more);
                     }
+                    // More than one step queued up means the last pass was slower than real time.
+                    let behind = merged.len() > step + step / 2;
                     since_step += merged.len();
                     st.buf.extend(merged);
+                    if st.skip_backlog() {
+                        tracing::warn!("live captions fell over {MAX_LAG_S} s behind; skipping ahead to now");
+                    }
                     if since_step < step && st.buf.len() < (MAX_S * HZ as f32) as usize {
                         continue;
                     }
                     since_step = 0;
+                    // Behind: refining the provisional line would only add to the lag.
+                    if behind && plan(&st.buf, false) == Plan::Partial {
+                        continue;
+                    }
                     if run_pass(&engine, &mut st, false, &tx).is_err() {
                         return;
                     }
@@ -82,6 +94,18 @@ pub struct LiveState {
 impl LiveState {
     pub fn new(lang: Option<String>) -> Self {
         LiveState { buf: Vec::with_capacity(HZ * 20), base: 0, prompt: String::new(), lang_locked: lang.is_some(), lang }
+    }
+
+    /// Keep only the newest `MAX_S` of audio when the buffer holds more than `MAX_LAG_S`.
+    pub fn skip_backlog(&mut self) -> bool {
+        let keep = (MAX_S * HZ as f32) as usize;
+        if self.buf.len() <= (MAX_LAG_S * HZ as f32) as usize {
+            return false;
+        }
+        let cut = self.buf.len() - keep;
+        self.buf.drain(..cut);
+        self.base += cut;
+        true
     }
 
     fn drop_buffer(&mut self) {
@@ -130,7 +154,11 @@ fn run_pass(engine: &WhisperEngine, st: &mut LiveState, flush: bool, tx: &Sender
         p => {
             let commit = p == Plan::Commit;
             let offset_ms = (st.base as i64) * 1000 / HZ as i64;
+            // On a CPU, encode only as much of whisper's 30 s window as the clip needs (50 frames/s).
+            let secs = st.buf.len() as f32 / HZ as f32;
+            let audio_ctx = if engine.is_gpu() || secs >= 25.0 { 0 } else { ((secs * 50.0) as i32 + 128).min(1500) };
             let opts = TranscribeOpts {
+                audio_ctx,
                 offset_ms,
                 lang: st.lang.as_deref(),
                 is_final: commit,
@@ -263,6 +291,18 @@ pub fn is_hallucination(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn backlog_is_capped_to_the_newest_audio() {
+        let mut st = LiveState::new(None);
+        st.buf = vec![0.1; (MAX_LAG_S * HZ as f32) as usize];
+        assert!(!st.skip_backlog(), "at the limit nothing is skipped");
+        st.buf.extend(vec![0.2; HZ]);
+        assert!(st.skip_backlog());
+        assert_eq!(st.buf.len(), (MAX_S * HZ as f32) as usize);
+        assert_eq!(st.base, (MAX_LAG_S * HZ as f32) as usize + HZ - st.buf.len());
+        assert_eq!(*st.buf.last().unwrap(), 0.2);
+    }
 
     fn tone(secs: f32, amp: f32) -> Vec<f32> {
         (0..(secs * HZ as f32) as usize).map(|i| (i as f32 * 0.05).sin() * amp).collect()

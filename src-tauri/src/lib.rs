@@ -56,6 +56,10 @@ pub fn run() {
                 log::warn!("hotkey: {e}");
             }
             recorder::recover_orphans(&handle);
+            {
+                let h = handle.clone();
+                std::thread::spawn(move || pipeline::repair_silent_videos(&h));
+            }
             detector_loop::spawn(handle.clone());
             calendar::spawn(handle.clone());
             spawn_engine_idle_unloader(handle.clone());
@@ -76,7 +80,7 @@ pub fn run() {
             if let Err(e) = handle.asset_protocol_scope().allow_directory(&recordings, true) {
                 log::warn!("asset scope: {e}");
             }
-            log::info!("Hark started; data dir {}", hark_store::data_dir().display());
+            log::info!("Debrief started; data dir {}", hark_store::data_dir().display());
             if handle.state::<AppState>().ffmpeg.is_none() {
                 log::warn!("ffmpeg sidecar not found; screen video disabled");
             }
@@ -134,6 +138,7 @@ pub fn run() {
             commands::speakers::delete_known_speaker,
             commands::speakers::rerun_cleanup,
             commands::speakers::test_llm_endpoint,
+            commands::speakers::list_cloud_models,
             commands::ai::list_templates,
             commands::ai::save_template,
             commands::ai::delete_template,
@@ -157,6 +162,7 @@ pub fn run() {
             commands::organize::tag_meeting,
             commands::organize::untag_meeting,
             commands::organize::export_clip,
+            commands::organize::export_audio,
             commands::organize::create_share,
             commands::organize::list_shares,
             commands::organize::set_share_enabled,
@@ -171,7 +177,7 @@ pub fn run() {
             commands::devices::sample_levels,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Hark");
+        .expect("error while running Debrief");
 }
 
 /// Free model memory after 10 minutes without use (never while recording).

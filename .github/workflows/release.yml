@@ -122,7 +122,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release view "${{ github.ref_name }}" >/dev/null 2>&1 || gh release create "${{ github.ref_name }}" --draft --title "Hark ${{ github.ref_name }}" --notes "See CHANGELOG.md."
+          gh release view "${{ github.ref_name }}" >/dev/null 2>&1 || gh release create "${{ github.ref_name }}" --draft --title "Debrief ${{ github.ref_name }}" --notes "See CHANGELOG.md."
           gh release upload "${{ github.ref_name }}" dist/* --clobber
       - uses: actions/upload-artifact@v4
         with:
@@ -156,10 +156,10 @@ jobs:
             [ -f "all/$2.sig" ] || { echo "missing signature for $2 (TAURI_SIGNING_PRIVATE_KEY secret unset?)"; return 0; }
             platforms=$(jq --arg k "$1" --arg u "$base/$2" --arg s "$(cat "all/$2.sig")" '. + {($k): {url: $u, signature: $s}}' <<<"$platforms")
           }
-          add windows-x86_64-cpu  "Hark_${ver}_x64-setup-cpu.exe"
-          add windows-x86_64-cuda "Hark_${ver}_x64-setup-cuda.exe"
-          add darwin-aarch64      "Hark-apple-silicon.app.tar.gz"
-          add darwin-x86_64       "Hark-intel.app.tar.gz"
+          add windows-x86_64-cpu  "Debrief_${ver}_x64-setup-cpu.exe"
+          add windows-x86_64-cuda "Debrief_${ver}_x64-setup-cuda.exe"
+          add darwin-aarch64      "Debrief-apple-silicon.app.tar.gz"
+          add darwin-x86_64       "Debrief-intel.app.tar.gz"
           mkdir -p out
           jq -n --arg v "$ver" --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson p "$platforms"             '{version: $v, notes: "See CHANGELOG.md", pub_date: $d, platforms: $p}' > out/latest.json
           cat out/latest.json

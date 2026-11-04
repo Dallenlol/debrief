@@ -51,7 +51,7 @@ pub fn list_video_sources(state: State<AppState>, meeting_app: Option<String>) -
     let mut seen: Vec<String> = Vec::new();
     let mut wins: Vec<VideoSource> = windows
         .into_iter()
-        .filter(|w| !w.title.trim().is_empty() && w.process != "hark.exe" && w.process != "hark")
+        .filter(|w| !w.title.trim().is_empty() && w.process != "debrief.exe" && w.process != "hark.exe" && w.process != "hark")
         .filter(|w| {
             if seen.iter().any(|t| t == &w.title) {
                 false
@@ -65,7 +65,7 @@ pub fn list_video_sources(state: State<AppState>, meeting_app: Option<String>) -
             is_meeting: meeting_title.as_deref() == Some(w.title.as_str()),
             label: w.title.chars().take(70).collect(),
             pid: (w.pid != 0).then_some(w.pid),
-            target: hark_capture::VideoTarget::Window { title: w.title },
+            target: hark_capture::VideoTarget::Window { title: w.title, hwnd: w.hwnd as u64 },
         })
         .collect();
     wins.sort_by_key(|w| !w.is_meeting);

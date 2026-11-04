@@ -1,13 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { ChatPanel } from "@/components/ChatPanel";
 
-/** "Ask Hark" across every meeting. Citations open the meeting at that time. */
+/** "Ask Debrief" across every meeting. Citations open the meeting at that time. */
 export function AskPage() {
   const navigate = useNavigate();
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col px-8 py-8">
       <header className="mb-4">
-        <h1 className="font-serif text-[34px] leading-none tracking-tight">Ask Hark</h1>
+        <h1 className="font-serif text-[34px] leading-none tracking-tight">Ask Debrief</h1>
         <p className="mt-1.5 text-[13px] text-ink-3">Questions across all your meetings, answered by the model running on this computer.</p>
       </header>
       <ChatPanel

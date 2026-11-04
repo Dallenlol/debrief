@@ -71,7 +71,7 @@ const settings: Settings = {
   onboarded: true, user_name: "Alex", language: "en", mic_device: null, loopback_device: null, capture_system: true, video_enabled: true,
   video_target: { kind: "monitor", index: 0 }, video_fps: 15, video_max_height: 1080, tier_override: null, live_asr_model: null, quality_asr_model: null, llm_model: null,
   hotkey: "CmdOrCtrl+Shift+R", detection_enabled: true, audio_activity_enabled: true, never_apps: [], popup_timeout_secs: 30, close_to_tray: true,
-  llm_backend: "bundled", llm_endpoint: "http://localhost:11434/v1", llm_endpoint_model: "qwen3:8b", llm_api_key: null, cleanup_enabled: true, diarize_enabled: true,
+  llm_backend: "bundled", llm_endpoint: "http://localhost:11434/v1", llm_endpoint_model: "qwen3:8b", llm_api_key: null, cloud_provider: "anthropic", cloud_api_key: null, cloud_model: "", cloud_context_tokens: null, cleanup_enabled: true, diarize_enabled: true,
   summary_enabled: true, default_template_id: "general", share_port: 47123, calendar_sources: [], calendar_refresh_min: 15, webhook_url: "", webhook_enabled: false, auto_update_check: true,
 };
 
@@ -121,7 +121,7 @@ const table: Record<string, (args: Record<string, unknown>) => unknown> = {
   sample_levels: () => [-30 + Math.random() * 10, -28 + Math.random() * 12],
   probe_hardware: () => ({ hardware: { cpu_cores: 16, cpu_name: "Ryzen 9 5900X", ram_gb: 31.2, gpu: { name: "NVIDIA GeForce RTX 3080", vram_gb: 10, backend: "cuda" }, os: "windows", arch: "x86_64" }, tier: "gpu", effective_tier: "gpu" }),
   list_models: () => [],
-  data_info: () => ({ data_dir: "C:\\Users\\alex\\AppData\\Roaming\\Hark", recordings_bytes: 1.4e9, models_bytes: 6.9e9 }),
+  data_info: () => ({ data_dir: "C:\\Users\\alex\\AppData\\Roaming\\Debrief", recordings_bytes: 1.4e9, models_bytes: 6.9e9 }),
 };
 
 export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {

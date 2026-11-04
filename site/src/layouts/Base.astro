@@ -18,7 +18,7 @@ const og = `${SITE.url}og.png`;
 const softwareLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Hark",
+  name: "Debrief",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Windows, macOS",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
@@ -47,7 +47,7 @@ const softwareLd = {
     <link rel="icon" href={`${base}/favicon.svg`} type="image/svg+xml" />
     <meta name="theme-color" content="#fbf9f5" />
     <meta property="og:type" content={ogType} />
-    <meta property="og:site_name" content="Hark" />
+    <meta property="og:site_name" content="Debrief" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
@@ -107,7 +107,7 @@ const softwareLd = {
       <nav class="top" aria-label="Main">
         <a class="brand" href={`${base}/`}>
           <span class="mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6v12M15 6v12M9 11.4h6" /></svg></span>
-          Hark
+          Debrief
         </a>
         <ul>
           <li><a href={`${base}/download/`}>Download</a></li>
@@ -120,7 +120,7 @@ const softwareLd = {
       <slot />
       <footer>
         <div class="cols">
-          <div>Hark is free and open source (MIT). No accounts, no telemetry, no cloud.</div>
+          <div>Debrief is free and open source (MIT). No accounts, no telemetry, no cloud.</div>
           <div>
             <a href={SITE.repo}>Source</a> &middot; <a href={`${SITE.repo}/issues`}>Issues</a> &middot; <a href={`${SITE.repo}/blob/main/CHANGELOG.md`}>Changelog</a> &middot; <a href={`${SITE.repo}/blob/main/docs/install.md`}>Docs</a>
           </div>

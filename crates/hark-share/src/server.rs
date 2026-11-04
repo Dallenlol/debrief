@@ -75,7 +75,7 @@ impl ShareServer {
             rt.block_on(async move {
                 let state = AppState { store, clips_dir };
                 let app = Router::new()
-                    .route("/", get(|| async { Html("<p>Hark share server. Links look like /s/&lt;token&gt;.</p>") }))
+                    .route("/", get(|| async { Html("<p>Debrief share server. Links look like /s/&lt;token&gt;.</p>") }))
                     .route("/s/{token}", get(page))
                     .route("/s/{token}/media", get(media))
                     .with_state(state);

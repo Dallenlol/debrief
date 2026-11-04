@@ -163,7 +163,7 @@ export function Library() {
           selection.kind === "all" ? (
             <EmptyState
               title="Nothing recorded yet."
-              body="Hark will offer to record when it notices a call. Or start one yourself, or import a recording you already have."
+              body="Debrief will offer to record when it notices a call. Or start one yourself, or import a recording you already have."
               action={<div className="flex items-center gap-2"><Button variant="primary" onClick={() => void cmd.openRecordPicker()}>Record now</Button><Button variant="outline" onClick={() => void importFiles()}><FileAudio size={14} /> Import a file</Button></div>}
             />
           ) : (

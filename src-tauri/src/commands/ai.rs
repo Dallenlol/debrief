@@ -2,7 +2,7 @@ use super::{err, CmdResult};
 use crate::events;
 use crate::pipeline;
 use crate::state::AppState;
-use hark_llm::chat::{build_messages, parse_citations, Passage};
+use hark_llm::chat::{build_messages_with, extract_messages, is_global, parse_citations, Material, Passage};
 use hark_llm::{GenOptions, Role};
 use hark_store::{Chat, ChatMessage, Summary, Template};
 use serde::Serialize;
@@ -180,35 +180,67 @@ pub fn send_chat(app: AppHandle, chat_id: String, text: String) -> CmdResult<Cha
     std::thread::spawn(move || {
         let state = app2.state::<AppState>();
         let _busy = state.busy_guard();
-        // Retrieval: BM25 + embeddings (when available); a single short meeting is passed whole.
-        let mut hits = match &scope_meeting {
+        let status = |text: String| {
+            let _ = app2.emit(events::CHAT_STATUS, ChatStatusPayload { chat_id: chat_id.clone(), message_id: msg_id.clone(), text });
+        };
+        // Room for the transcript: the model's window minus the reply, the instructions and the chat so far.
+        let history_tokens: usize = history.iter().rev().take(8).map(|(_, c)| est_tokens(c)).sum();
+        let budget = backend.context_tokens().saturating_sub(REPLY_TOKENS + 1500 + history_tokens);
+        let summary = scope_meeting.as_ref().and_then(|mid| state.store.get_summary(mid).ok().flatten()).map(|s| s.markdown);
+        let budget = budget.saturating_sub(summary.as_deref().map(est_tokens).unwrap_or(0));
+        let to_passage = |h: &hark_store::ChunkHit| Passage {
+            meeting_id: h.meeting_id.clone(),
+            meeting_title: h.meeting_title.clone(),
+            meeting_date: h.started_at.format("%b %-d, %Y").to_string(),
+            start_ms: h.start_ms,
+            end_ms: h.end_ms,
+            text: h.text.clone(),
+        };
+        let (material, mut hits) = match &scope_meeting {
             Some(mid) => {
                 let all = state.store.chunks(mid).unwrap_or_default();
-                if all.len() <= 12 {
-                    all
+                let total: usize = all.iter().map(|c| est_tokens(&c.text)).sum();
+                if total <= budget {
+                    (Material::Full, all)
+                } else if is_global(&text) {
+                    (Material::Extracts, all)
                 } else {
-                    crate::embed_stage::retrieve(&state, &text, Some(mid), 10)
+                    (Material::Excerpts, fill_budget(crate::embed_stage::retrieve(&state, &text, Some(mid), 400), budget))
                 }
             }
-            None => crate::embed_stage::retrieve(&state, &text, None, 12),
+            None => (Material::Excerpts, fill_budget(crate::embed_stage::retrieve(&state, &text, None, 400), budget)),
         };
         hits.sort_by(|a, b| a.meeting_id.cmp(&b.meeting_id).then(a.start_ms.cmp(&b.start_ms)));
-        let passages: Vec<Passage> = hits
-            .iter()
-            .map(|h| Passage {
-                meeting_id: h.meeting_id.clone(),
-                meeting_title: h.meeting_title.clone(),
-                meeting_date: h.started_at.format("%b %-d, %Y").to_string(),
-                start_ms: h.start_ms,
-                end_ms: h.end_ms,
-                text: h.text.clone(),
-            })
-            .collect();
-        let msgs = build_messages(&text, &history, &passages, scope_meeting.is_none());
+        let passages: Vec<Passage> = if material == Material::Extracts {
+            // Whole-meeting question on a meeting too long for the model: read it part by part,
+            // keep what each part says about the question, then answer from those notes.
+            let blocks = split_hits(&hits, (budget / 2).clamp(2000, 60_000));
+            let mut notes = Vec::new();
+            for (i, block) in blocks.iter().enumerate() {
+                if cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+                status(format!("Reading part {} of {}", i + 1, blocks.len()));
+                let body: String = block.iter().map(|h| format!("[{}]\n{}\n", hark_llm::summary::fmt_stamp(h.start_ms), h.text.trim())).collect();
+                match hark_llm::backend::complete(backend.as_ref(), &extract_messages(&text, &body), &GenOptions { max_tokens: 900, temperature: 0.1, json: false }) {
+                    Ok(n) if !n.trim().eq_ignore_ascii_case("none") && !n.trim().is_empty() => {
+                        let (first, last) = (block.first().expect("non-empty"), block.last().expect("non-empty"));
+                        notes.push(Passage { start_ms: first.start_ms, end_ms: last.end_ms, text: n, ..to_passage(first) });
+                    }
+                    Ok(_) => {}
+                    Err(e) => log::warn!("chat extract part {}: {e}", i + 1),
+                }
+            }
+            status("Writing the answer".into());
+            notes
+        } else {
+            hits.iter().map(to_passage).collect()
+        };
+        let msgs = build_messages_with(&text, &history, &passages, scope_meeting.is_none(), material, summary.as_deref());
         let mut full = String::new();
         let chat_id2 = chat_id.clone();
         let msg_id2 = msg_id.clone();
-        let result = backend.chat(&msgs, &GenOptions { max_tokens: 800, temperature: 0.2, json: false }, &mut |delta| {
+        let result = backend.chat(&msgs, &GenOptions { max_tokens: REPLY_TOKENS, temperature: 0.2, json: false }, &mut |delta| {
             full.push_str(delta);
             let _ = app2.emit(
                 events::CHAT_TOKEN,
@@ -228,6 +260,55 @@ pub fn send_chat(app: AppHandle, chat_id: String, text: String) -> CmdResult<Cha
         let _ = app2.emit(events::CHAT_DONE, ChatDonePayload { chat_id: chat_id.clone(), message, error });
     });
     Ok(ChatMessage { content: String::new(), ..assistant })
+}
+
+/// Longest answer a chat reply may run to.
+const REPLY_TOKENS: usize = 2500;
+
+#[derive(Serialize, Clone)]
+pub struct ChatStatusPayload {
+    pub chat_id: String,
+    pub message_id: String,
+    pub text: String,
+}
+
+/// Rough token count; errs high (about 3 characters a token) so prompts never overflow.
+fn est_tokens(s: &str) -> usize {
+    s.len() / 3 + 4
+}
+
+/// Keep the best-ranked hits (input order) that fit in `budget` tokens.
+fn fill_budget(hits: Vec<hark_store::ChunkHit>, budget: usize) -> Vec<hark_store::ChunkHit> {
+    let mut used = 0;
+    let mut out = Vec::new();
+    for h in hits {
+        let t = est_tokens(&h.text) + 12;
+        if used + t > budget {
+            if out.is_empty() {
+                continue;
+            }
+            break;
+        }
+        used += t;
+        out.push(h);
+    }
+    out
+}
+
+/// Consecutive runs of chunks of at most `block_tokens` each.
+fn split_hits(hits: &[hark_store::ChunkHit], block_tokens: usize) -> Vec<Vec<hark_store::ChunkHit>> {
+    let mut blocks: Vec<Vec<hark_store::ChunkHit>> = Vec::new();
+    let mut used = 0;
+    for h in hits {
+        let t = est_tokens(&h.text) + 12;
+        if blocks.is_empty() || used + t > block_tokens {
+            blocks.push(Vec::new());
+            used = 0;
+        }
+        used += t;
+        blocks.last_mut().expect("pushed").push(h.clone());
+    }
+    blocks
 }
 
 #[tauri::command]

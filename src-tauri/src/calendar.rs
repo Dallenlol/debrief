@@ -33,7 +33,7 @@ fn load_source(src: &str) -> Result<String, String> {
     if src.starts_with("http://") || src.starts_with("https://") || src.starts_with("webcal://") {
         let url = src.replacen("webcal://", "https://", 1);
         let client = reqwest::blocking::Client::builder()
-            .user_agent(concat!("Hark/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("Debrief/", env!("CARGO_PKG_VERSION")))
             .timeout(StdDuration::from_secs(20))
             .build()
             .map_err(|e| e.to_string())?;

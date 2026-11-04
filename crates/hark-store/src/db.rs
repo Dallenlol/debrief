@@ -7,7 +7,21 @@ use std::path::{Path, PathBuf};
 /// `~/Library/Application Support/Hark` on macOS, `~/.local/share/hark` elsewhere.
 pub fn default_data_dir() -> PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
-    if cfg!(target_os = "linux") { base.join("hark") } else { base.join("Hark") }
+    let (new, old) = if cfg!(target_os = "linux") { ("debrief", "hark") } else { ("Debrief", "Hark") };
+    migrate_data_dir(&base.join(old), &base.join(new))
+}
+
+/// The app was called Hark: move its folder (database, recordings, models, and the
+/// pointer to a custom data folder) to the new name once. If the move fails (the old
+/// app still running, say), keep using the old folder so nothing goes missing.
+fn migrate_data_dir(old: &Path, new: &Path) -> PathBuf {
+    if new.exists() || !old.exists() {
+        return new.to_path_buf();
+    }
+    match std::fs::rename(old, new) {
+        Ok(()) => new.to_path_buf(),
+        Err(_) => old.to_path_buf(),
+    }
 }
 
 const POINTER_FILE: &str = "data-dir.txt";

@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Hark records your side of meetings from the microphone when you press Record.</string>
+  <string>Debrief records your side of meetings from the microphone when you press Record.</string>
   <key>NSAudioCaptureUsageDescription</key>
-  <string>Hark records the other participants from system audio when you press Record.</string>
+  <string>Debrief records the other participants from system audio when you press Record.</string>
   <key>NSScreenCaptureUsageDescription</key>
-  <string>Hark records your screen during a meeting only if you turn on screen video.</string>
+  <string>Debrief records your screen during a meeting only if you turn on screen video.</string>
 </dict>
 </plist>

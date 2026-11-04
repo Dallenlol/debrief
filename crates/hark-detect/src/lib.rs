@@ -5,6 +5,7 @@
 
 mod audio_activity;
 mod debounce;
+pub mod ocr;
 mod participants;
 mod patterns;
 mod windows_enum;

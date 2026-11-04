@@ -41,9 +41,9 @@ export function UpdateBanner() {
     <div role="status" className="rise pointer-events-auto fixed right-4 bottom-4 z-50 flex w-[360px] items-start gap-2.5 rounded-lg border border-line bg-canvas p-3 text-[13px] shadow-float">
       <Download size={15} className="mt-0.5 shrink-0 text-ink-2" />
       <div className="min-w-0 flex-1">
-        <div className="font-medium text-ink">Hark {update.version} is available</div>
+        <div className="font-medium text-ink">Debrief {update.version} is available</div>
         <div className="mt-0.5 text-ink-3">
-          {state === "installing" ? `Downloading ${progress}... Hark restarts when it is done.` : state === "failed" ? "Install failed. Download it from the releases page instead." : "Installs in the background, then restarts."}
+          {state === "installing" ? `Downloading ${progress}... Debrief restarts when it is done.` : state === "failed" ? "Install failed. Download it from the releases page instead." : "Installs in the background, then restarts."}
         </div>
         {state === "idle" && (
           <div className="mt-2 flex gap-2">

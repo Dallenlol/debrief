@@ -136,6 +136,10 @@ impl LlmBackend for LlamaEngine {
     fn name(&self) -> String {
         self.name.clone()
     }
+
+    fn context_tokens(&self) -> usize {
+        self.n_ctx as usize
+    }
 }
 
 /// Remove a `<think>...</think>` block some models emit.

@@ -60,6 +60,11 @@ impl WhisperEngine {
         self
     }
 
+    /// Whether the model runs on the GPU (it falls back to CPU when GPU init fails).
+    pub fn is_gpu(&self) -> bool {
+        self.gpu
+    }
+
     pub fn model_id(&self) -> &str {
         &self.model_id
     }
@@ -100,6 +105,9 @@ impl WhisperEngine {
         params.set_token_timestamps(true);
         params.set_max_len(o.max_len);
         params.set_split_on_word(o.max_len > 0);
+        if o.audio_ctx > 0 {
+            params.set_audio_ctx(o.audio_ctx);
+        }
         if let Some(p) = o.prompt.filter(|p| !p.trim().is_empty()) {
             params.set_initial_prompt(p);
         }
@@ -132,6 +140,9 @@ impl WhisperEngine {
 /// Options for [`WhisperEngine::transcribe_opts`].
 #[derive(Debug, Clone, Default)]
 pub struct TranscribeOpts<'a> {
+    /// Encoder window in 20 ms frames (0 = the full 30 s). Smaller is much faster for short live
+    /// clips on a CPU, at a small cost in accuracy.
+    pub audio_ctx: i32,
     pub offset_ms: i64,
     /// ISO code like "en"; `None` = auto-detect.
     pub lang: Option<&'a str>,

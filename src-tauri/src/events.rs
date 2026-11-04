@@ -11,6 +11,8 @@ pub const PROCESSING: &str = "processing";
 pub const NOTICE: &str = "notice";
 pub const CHAT_TOKEN: &str = "chat_token";
 pub const CHAT_DONE: &str = "chat_done";
+/// Progress line while a long answer is being prepared ("Reading part 2 of 6").
+pub const CHAT_STATUS: &str = "chat_status";
 pub const PARTICIPANTS: &str = "participants";
 pub const LIVE_NOTES: &str = "live_notes";
 

@@ -10,6 +10,7 @@ pub struct OpenAiCompat {
     pub base_url: String,
     pub api_key: Option<String>,
     pub model: String,
+    context_tokens: usize,
     client: reqwest::blocking::Client,
 }
 
@@ -33,6 +34,8 @@ struct ModelsResp {
 #[derive(Deserialize)]
 struct ModelRow {
     id: String,
+    /// OpenRouter reports each model's context window.
+    context_length: Option<usize>,
 }
 
 impl OpenAiCompat {
@@ -42,18 +45,35 @@ impl OpenAiCompat {
             base_url: base_url.trim_end_matches('/').to_string(),
             api_key: api_key.map(str::to_string),
             model: model.to_string(),
+            context_tokens: 8192,
             client,
         }
     }
 
+    /// The model's context window; local servers (Ollama) default to 8k.
+    pub fn with_context(mut self, tokens: usize) -> Self {
+        self.context_tokens = tokens.max(2048);
+        self
+    }
+
+    /// OpenAI's reasoning models (o-series, gpt-5) reject `max_tokens` and custom temperature.
+    fn openai_reasoning(&self) -> bool {
+        self.base_url.contains("api.openai.com") && (self.model.starts_with('o') || self.model.starts_with("gpt-5"))
+    }
+
     /// List model ids the endpoint offers (used by the Settings "Test" button).
     pub fn list_models(&self) -> Result<Vec<String>, LlmError> {
+        Ok(self.list_models_with_context()?.into_iter().map(|(id, _)| id).collect())
+    }
+
+    /// Model ids with their context window where the endpoint reports it.
+    pub fn list_models_with_context(&self) -> Result<Vec<(String, Option<usize>)>, LlmError> {
         let mut req = self.client.get(format!("{}/models", self.base_url)).timeout(Duration::from_secs(10));
         if let Some(k) = &self.api_key {
             req = req.bearer_auth(k);
         }
         let resp: ModelsResp = req.send().map_err(|e| LlmError::Http(e.to_string()))?.error_for_status().map_err(|e| LlmError::Http(e.to_string()))?.json().map_err(|e| LlmError::Http(e.to_string()))?;
-        Ok(resp.data.into_iter().map(|m| m.id).collect())
+        Ok(resp.data.into_iter().map(|m| (m.id, m.context_length)).collect())
     }
 }
 
@@ -62,10 +82,14 @@ impl LlmBackend for OpenAiCompat {
         let mut body = serde_json::json!({
             "model": self.model,
             "messages": msgs.iter().map(|m| serde_json::json!({"role": m.role.as_str(), "content": m.content})).collect::<Vec<_>>(),
-            "temperature": opts.temperature,
-            "max_tokens": opts.max_tokens,
             "stream": true,
         });
+        if self.openai_reasoning() {
+            body["max_completion_tokens"] = serde_json::json!(opts.max_tokens.max(4096));
+        } else {
+            body["temperature"] = serde_json::json!(opts.temperature);
+            body["max_tokens"] = serde_json::json!(opts.max_tokens);
+        }
         if opts.json {
             body["response_format"] = serde_json::json!({"type": "json_object"});
         }
@@ -107,5 +131,9 @@ impl LlmBackend for OpenAiCompat {
 
     fn name(&self) -> String {
         format!("{} @ {}", self.model, self.base_url)
+    }
+
+    fn context_tokens(&self) -> usize {
+        self.context_tokens
     }
 }

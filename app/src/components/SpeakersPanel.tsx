@@ -18,7 +18,7 @@ interface SpeakersPanelProps {
 }
 
 /**
- * Everyone Hark heard in this meeting. Naming two rows the same person merges
+ * Everyone Debrief heard in this meeting. Naming two rows the same person merges
  * them - which is how you fix one voice that was split into two speakers.
  */
 export function SpeakersPanel({ stats, speakers, nameOptions = [], onRename, onAcceptSuggestion, onDismissSuggestion, className }: SpeakersPanelProps) {
@@ -153,7 +153,7 @@ export function SpeakersPanel({ stats, speakers, nameOptions = [], onRename, onA
       )}
       {stats.length > 1 && (
         <p className="mt-2 text-[12px] text-ink-3">
-          Split one person into two? Give both rows the same name (or pick them in "Same person as") and Hark merges them everywhere, including the summary.
+          Split one person into two? Give both rows the same name (or pick them in "Same person as") and Debrief merges them everywhere, including the summary.
         </p>
       )}
     </div>

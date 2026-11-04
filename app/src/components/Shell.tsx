@@ -1,5 +1,6 @@
-import { Circle, Library, MessageCircle, Settings as SettingsIcon, Square } from "lucide-react";
+import { Circle, Library, MessageCircle, Moon, Settings as SettingsIcon, Square, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTheme } from "@/lib/theme";
 import { NavLink, Outlet } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { fmtDuration } from "@/lib/format";
@@ -43,16 +44,18 @@ export function Shell() {
       <aside className="relative z-10 flex w-[232px] shrink-0 flex-col border-r border-line bg-canvas-2/60 backdrop-blur">
         <div className="flex items-center gap-2 px-5 pt-5 pb-4">
           <span className="grid h-7 w-7 place-items-center rounded-md bg-ink text-canvas">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M9 6v12M15 6v12M9 11.4h6" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+              <path d="M10 7.6a5.4 4.4 0 0 1 0 8.8" className="stroke-ember" strokeLinecap="butt" />
+              <path d="M8.6 6v12" stroke="currentColor" />
             </svg>
           </span>
-          <span className="font-serif text-[22px] leading-none tracking-tight">Hark</span>
+          <span className="font-serif text-[22px] leading-none tracking-tight">Debrief</span>
+          <ThemeToggle />
         </div>
 
         <nav className="flex flex-col gap-0.5 px-3">
           <NavItem to="/" icon={<Library size={16} />} label="Library" />
-          <NavItem to="/ask" icon={<MessageCircle size={16} />} label="Ask Hark" />
+          <NavItem to="/ask" icon={<MessageCircle size={16} />} label="Ask Debrief" />
           <NavItem to="/settings" icon={<SettingsIcon size={16} />} label="Settings" />
         </nav>
 
@@ -125,5 +128,20 @@ function DownloadPill({ downloads }: { downloads: Record<string, { done: number;
       </span>
       <span className="h-1 w-full overflow-hidden rounded-full bg-line"><span className="block h-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></span>
     </NavLink>
+  );
+}
+
+function ThemeToggle() {
+  const [theme, setTheme] = useTheme();
+  const next = theme === "dark" ? "light" : "dark";
+  return (
+    <button
+      onClick={() => setTheme(next)}
+      className="focus-ring ml-auto grid h-7 w-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-canvas-3 hover:text-ink"
+      title={`Switch to ${next} mode`}
+      aria-label={`Switch to ${next} mode`}
+    >
+      {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+    </button>
   );
 }

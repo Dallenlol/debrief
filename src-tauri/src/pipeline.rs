@@ -5,7 +5,7 @@ use crate::events::{self, ProcessingPayload};
 use crate::recorder::{notice, read_wav_as_16k_mono};
 use crate::state::AppState;
 use hark_capture::dsp::rms_db;
-use hark_capture::video::{ffmpeg_mux_args, run_ffmpeg};
+use hark_capture::video::{ffmpeg_mux_args, has_audio_stream, run_ffmpeg};
 use hark_diarize::{assign_clusters, best_match, find_me_cluster, DiarizeOutput, KnownSpeaker, Turn};
 use hark_store::{Meeting, MeetingSpeaker, MeetingStatus, NewSegment};
 use std::collections::BTreeMap;
@@ -15,6 +15,64 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Cosine similarity needed to suggest a known speaker (TitaNet same-speaker ~0.6-0.85).
 pub const SUGGEST_THRESHOLD: f32 = 0.62;
 const LEVEL_HOP_MS: i64 = 250;
+
+/// Start of the meeting error left when the screen video could not get its audio track.
+const MUX_ERROR: &str = "video: the screen recording could not get its sound track";
+const MUX_ATTEMPTS: u64 = 3;
+
+/// Mux mix.wav into the screen video: `video` is screen.raw.mp4 or a silent screen.mp4,
+/// the result replaces screen.mp4. Retries: ffmpeg once failed on a file it muxed fine
+/// minutes later (Oct 14 2026, a meeting recovered right after Debrief restarted).
+fn mux_screen(ffmpeg: &Path, dir: &Path, video: &Path) -> Result<(), String> {
+    let tmp = dir.join("screen.muxing.mp4");
+    let mut last = String::new();
+    for attempt in 1..=MUX_ATTEMPTS {
+        match run_ffmpeg(ffmpeg, &ffmpeg_mux_args(video, &dir.join("mix.wav"), &tmp)) {
+            Ok(()) => {
+                std::fs::rename(&tmp, dir.join("screen.mp4")).map_err(|e| format!("replace screen.mp4: {e}"))?;
+                if video.file_name().is_some_and(|n| n == "screen.raw.mp4") {
+                    let _ = std::fs::remove_file(video);
+                }
+                return Ok(());
+            }
+            Err(e) => {
+                log::warn!("mux attempt {attempt}/{MUX_ATTEMPTS} failed: {e}");
+                last = e;
+            }
+        }
+        if attempt < MUX_ATTEMPTS {
+            std::thread::sleep(std::time::Duration::from_secs(3 * attempt));
+        }
+    }
+    let _ = std::fs::remove_file(&tmp);
+    Err(last)
+}
+
+/// Startup pass: finished meetings whose screen.mp4 has no audio track while mix.wav
+/// exists (an earlier mux failed) get the audio muxed back in.
+pub fn repair_silent_videos(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let Some(ffmpeg) = state.ffmpeg.clone() else { return };
+    let Ok(meetings) = state.store.list_meetings() else { return };
+    // fable: probes every video meeting on each start (~0.1 s each); cache a "checked" flag if libraries get huge.
+    for m in meetings.into_iter().filter(|m| m.has_video && matches!(m.status, MeetingStatus::Ready | MeetingStatus::Failed)) {
+        let dir = state.store.recordings_dir(&m.id);
+        let screen = dir.join("screen.mp4");
+        if !dir.join("mix.wav").exists() || !screen.exists() || has_audio_stream(&ffmpeg, &screen) != Some(false) {
+            continue;
+        }
+        log::info!("screen video of {} has no audio track; muxing mix.wav back in", m.id);
+        match mux_screen(&ffmpeg, &dir, &screen) {
+            Ok(()) => {
+                if m.error.as_deref().is_some_and(|e| e.starts_with(MUX_ERROR)) {
+                    let _ = state.store.set_meeting_error(&m.id, None);
+                }
+                notice(app, "info", format!("Restored the sound in the screen recording of \"{}\".", m.title));
+            }
+            Err(e) => log::warn!("repair mux for {} failed: {e}", m.id),
+        }
+    }
+}
 
 /// One-off choices for a (re-)run of the pipeline.
 #[derive(Default, Clone)]
@@ -39,20 +97,28 @@ pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) 
         let _ = app.emit(events::PROCESSING, ProcessingPayload { meeting_id: meeting_id.clone(), stage, progress, error });
     };
 
-    // 1. Mux video (if any).
+    // 1. Mux video (if any): the fresh capture, or a screen.mp4 an earlier run left silent.
     emit("mux", 0.02, None);
     let raw = dir.join("screen.raw.mp4");
-    if meeting.has_video && raw.exists() {
-        if let Some(ffmpeg) = &state.ffmpeg {
-            let out = dir.join("screen.mp4");
-            match run_ffmpeg(ffmpeg, &ffmpeg_mux_args(&raw, &dir.join("mix.wav"), &out)) {
-                Ok(()) => {
-                    let _ = std::fs::remove_file(&raw);
+    let screen = dir.join("screen.mp4");
+    if let (true, Some(ffmpeg)) = (meeting.has_video, &state.ffmpeg) {
+        let input = if raw.exists() {
+            Some(raw.clone())
+        } else {
+            (screen.exists() && has_audio_stream(ffmpeg, &screen) == Some(false)).then(|| screen.clone())
+        };
+        if let Some(input) = input {
+            if let Err(e) = mux_screen(ffmpeg, &dir, &input) {
+                log::error!("mux failed: {e}");
+                // Keep the video viewable: the player takes its sound from mix.wav,
+                // and the next start (or Retry) puts the audio track back in.
+                if input == raw {
+                    let _ = std::fs::rename(&raw, &screen);
                 }
-                Err(e) => {
-                    log::error!("mux failed: {e}");
-                    let _ = std::fs::rename(&raw, &out);
-                }
+                let msg = format!("{MUX_ERROR} ({e}). The audio itself is safe and plays normally; Debrief will try again the next time it starts.");
+                notice(app, "warning", format!("\"{}\": {msg}", meeting.title));
+                meeting.error = Some(msg.clone());
+                let _ = state.store.set_meeting_error(&meeting_id, Some(&msg));
             }
         }
     }
@@ -75,8 +141,8 @@ pub fn post_process_with(app: &AppHandle, mut meeting: Meeting, opts: PostOpts) 
     // Speaker detection does not need the transcript: run it now, in parallel
     // with whisper (sidecar processes on the CPU; whisper on the GPU where there is one).
     let diar_job = settings.diarize_enabled.then(|| {
-        let (app2, dir2) = (app.clone(), dir.clone());
-        std::thread::spawn(move || diarize_raw(&app2, &dir2))
+        let (app2, dir2, id2) = (app.clone(), dir.clone(), meeting.id.clone());
+        std::thread::spawn(move || diarize_raw(&app2, &id2, &dir2))
     });
     // On CPU-only machines the tier's model may be too slow for a long recording;
     // pick the best downloaded model that finishes in reasonable time (measured per machine).
@@ -171,7 +237,7 @@ pub fn run_cleanup(app: &AppHandle, meeting_id: &str) {
     let state = app.state::<AppState>();
     let _busy = state.busy_guard();
     let Some(backend) = state.llm() else {
-        notice(app, "info", "Transcript cleanup skipped: no language model available. Download one in Settings or point Hark at an endpoint.".into());
+        notice(app, "info", "Transcript cleanup skipped: no language model available. Download one in Settings or point Debrief at an endpoint.".into());
         let _ = state.store.set_meeting_error(meeting_id, Some(NO_LLM));
         return;
     };
@@ -213,13 +279,13 @@ type Diarized = (Vec<Option<String>>, Vec<MeetingSpeaker>, BTreeMap<String, Vec<
 /// transcript segment): per-segment labels, the meeting_speakers rows (with
 /// voice-memory suggestions) and the per-label embeddings.
 fn diarize_spans(app: &AppHandle, meeting_id: &str, dir: &Path, spans: &[(i64, i64)]) -> Result<Diarized, String> {
-    let out = diarize_raw(app, dir)?;
+    let out = diarize_raw(app, meeting_id, dir)?;
     map_diarization(app, meeting_id, dir, spans, out)
 }
 
 /// The expensive half: run the sidecar(s) over mix.wav and consolidate the
 /// clusters. Independent of the transcript, so it can run alongside whisper.
-fn diarize_raw(app: &AppHandle, dir: &Path) -> Result<DiarizeOutput, String> {
+fn diarize_raw(app: &AppHandle, meeting_id: &str, dir: &Path) -> Result<DiarizeOutput, String> {
     let state = app.state::<AppState>();
     let mut out = run_diarize_sidecar(&state, &dir.join("mix.wav"))?;
     if out.turns.is_empty() {
@@ -228,11 +294,23 @@ fn diarize_raw(app: &AppHandle, dir: &Path) -> Result<DiarizeOutput, String> {
     // Long, noisy calls come back over-segmented (hundreds of clusters); fold the
     // slivers into their nearest voice and cap the count at a plausible meeting.
     let raw_clusters = out.embeddings.len();
-    hark_diarize::consolidate(&mut out.turns, &mut out.embeddings, hark_diarize::consolidate::MAX_SPEAKERS);
+    let participants = state.store.get_meeting(meeting_id).ok().flatten().map(|m| m.participants).unwrap_or_default();
+    let max = speaker_cap(&participants, &state.settings.read().user_name);
+    hark_diarize::consolidate(&mut out.turns, &mut out.embeddings, max);
     if out.embeddings.len() < raw_clusters {
         log::info!("diarization: {} clusters consolidated to {}", raw_clusters, out.embeddings.len());
     }
     Ok(out)
+}
+
+/// Most voices a meeting can have: the people seen in it (names on screen or in the app's
+/// attendee list), plus you, plus one who never showed a name. Unknown: the general cap.
+fn speaker_cap(participants: &[String], me: &str) -> usize {
+    let others = participants.iter().filter(|p| !p.trim().eq_ignore_ascii_case(me.trim())).count();
+    if others < 2 {
+        return hark_diarize::consolidate::MAX_SPEAKERS;
+    }
+    (others + 2).min(hark_diarize::consolidate::MAX_SPEAKERS)
 }
 
 /// The cheap half: attach clusters to transcript spans, name them, match voices.
@@ -434,7 +512,7 @@ fn run_diarize_sidecar(state: &AppState, wav: &Path) -> Result<DiarizeOutput, St
         .map(|&(start, end)| {
             let (bin, seg, emb, wav) = (bin.clone(), seg.clone(), emb.clone(), wav.to_path_buf());
             std::thread::spawn(move || -> Result<DiarizeOutput, String> {
-                let mut cmd = std::process::Command::new(&bin);
+                let mut cmd = hark_capture::hidden_command(&bin);
                 cmd.arg("--seg").arg(&seg).arg("--emb").arg(&emb).arg("--wav").arg(&wav).arg("--threads").arg(threads.to_string());
                 cmd.arg("--start-ms").arg(start.to_string()).arg("--end-ms").arg(end.to_string());
                 let out = cmd.stdin(std::process::Stdio::null()).output().map_err(|e| format!("spawn sidecar: {e}"))?;
@@ -459,4 +537,19 @@ fn run_diarize_sidecar(state: &AppState, wav: &Path) -> Result<DiarizeOutput, St
     let (turns, embeddings) = hark_diarize::shards::stitch(results);
     log::info!("diarization: {} turns, {} clusters in {:.1}s", turns.len(), embeddings.len(), started.elapsed().as_secs_f32());
     Ok(DiarizeOutput { turns, embeddings, embedding_dim: dim, error: None })
+}
+
+#[cfg(test)]
+mod speaker_cap_tests {
+    use super::speaker_cap;
+    use hark_diarize::consolidate::MAX_SPEAKERS;
+
+    #[test]
+    fn caps_voices_by_people_seen() {
+        let p = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(speaker_cap(&p(&[]), "Dallen"), MAX_SPEAKERS);
+        assert_eq!(speaker_cap(&p(&["Priya"]), "Dallen"), MAX_SPEAKERS, "one name is too little to trust");
+        assert_eq!(speaker_cap(&p(&["Priya", "Marcus", "dallen"]), "Dallen"), 4, "two others + me + one unnamed");
+        assert_eq!(speaker_cap(&p(&["a", "b", "c", "d", "e", "f", "g", "h"]), "Me"), MAX_SPEAKERS);
+    }
 }

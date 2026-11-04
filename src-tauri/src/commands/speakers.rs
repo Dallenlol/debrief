@@ -114,6 +114,32 @@ pub fn rerun_cleanup(app: AppHandle, id: String) -> CmdResult<()> {
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+pub struct CloudModel {
+    pub id: String,
+    pub context: Option<usize>,
+}
+
+/// Check a cloud API key and list the models it can use (Claude, OpenAI or OpenRouter).
+#[tauri::command]
+pub async fn list_cloud_models(provider: String, api_key: String) -> CmdResult<Vec<CloudModel>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let key = api_key.trim();
+        if key.is_empty() {
+            return Err("Paste an API key first.".to_string());
+        }
+        let rows: Vec<(String, Option<usize>)> = match provider.as_str() {
+            "anthropic" => hark_llm::AnthropicApi::new(key, "", None).list_models().map_err(|e| e.to_string())?.into_iter().map(|m| (m.id, m.max_input_tokens)).collect(),
+            "openai" => hark_llm::OpenAiCompat::new(crate::state::OPENAI_BASE, Some(key), "").list_models_with_context().map_err(|e| e.to_string())?,
+            "openrouter" => hark_llm::OpenAiCompat::new(crate::state::OPENROUTER_BASE, Some(key), "").list_models_with_context().map_err(|e| e.to_string())?,
+            other => return Err(format!("unknown provider {other}")),
+        };
+        Ok(rows.into_iter().map(|(id, context)| CloudModel { id, context }).collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Try an OpenAI-compatible endpoint; returns the model list on success.
 #[tauri::command]
 pub async fn test_llm_endpoint(url: String, api_key: Option<String>, model: String) -> CmdResult<Vec<String>> {

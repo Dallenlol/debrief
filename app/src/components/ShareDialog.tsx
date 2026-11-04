@@ -1,5 +1,5 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Check, Copy, Link2, Scissors, X } from "lucide-react";
+import { Check, Copy, Link2, Music, Scissors, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fmtDuration } from "@/lib/format";
 import { cmd, type ShareInfo } from "@/lib/ipc";
@@ -73,7 +73,7 @@ export function ShareDialog({ meetingId, title, durationMs, hasVideo, currentMs,
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="font-serif text-[22px] leading-tight">Share or export</h2>
-            <p className="text-[12px] text-ink-3">Links only work on your network while Hark is open. Files work anywhere.</p>
+            <p className="text-[12px] text-ink-3">Links only work on your network while Debrief is open. Files work anywhere.</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="focus-ring rounded text-ink-3 hover:text-ink"><X size={18} /></button>
         </div>
@@ -134,13 +134,21 @@ export function ShareDialog({ meetingId, title, durationMs, hasVideo, currentMs,
         <section>
           <h3 className="mb-2 text-[11px] font-semibold tracking-[0.12em] text-ink-3 uppercase">Export</h3>
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void run("mp3", async () => {
+              const out = await save({ defaultPath: `${safe(title)}.mp3`, filters: [{ name: "MP3 audio", extensions: ["mp3"] }] });
+              if (!out) return;
+              await cmd.exportAudio(meetingId, out);
+              return `Saved ${out} (and the transcript as a .txt beside it)`;
+            })}>
+              <Music size={14} /> Audio (MP3)
+            </Button>
             <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void run("bundle", async () => {
-              const out = await save({ defaultPath: `${safe(title)}.hark`, filters: [{ name: "Hark bundle", extensions: ["hark"] }] });
+              const out = await save({ defaultPath: `${safe(title)}.debrief`, filters: [{ name: "Debrief bundle", extensions: ["debrief"] }] });
               if (!out) return;
               await cmd.exportMeetings([meetingId], out, includeVideo);
               return `Saved ${out}. Import it on another computer from Settings > Data.`;
             })}>
-              .hark bundle
+              .debrief bundle
             </Button>
             <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void run("html", async () => {
               const dir = await open({ directory: true, title: "Choose a folder for the web page" });

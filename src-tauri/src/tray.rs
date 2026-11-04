@@ -10,7 +10,7 @@ pub const TRAY_ID: &str = "hark-tray";
 
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open Hark", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open Debrief", true, None::<&str>)?;
     let toggle = MenuItem::with_id(app, "toggle", "Start recording", true, None::<&str>)?;
     let detect = MenuItem::with_id(app, "detect", "Pause detection", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -18,7 +18,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(app.default_window_icon().cloned().expect("app icon"))
-        .tooltip("Hark")
+        .tooltip("Debrief")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, ev| match ev.id().as_ref() {

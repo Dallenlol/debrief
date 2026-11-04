@@ -103,6 +103,33 @@ pub fn export_clip(state: State<AppState>, id: String, start_ms: i64, end_ms: i6
     Ok(out)
 }
 
+/// The whole call's audio as an MP3 (mono, 64 kbps: ~30 MB an hour), with the transcript
+/// as a `.txt` beside it, ready to drop into another tool.
+#[tauri::command]
+pub async fn export_audio(app: tauri::AppHandle, id: String, out: String) -> CmdResult<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let ffmpeg = state.ffmpeg.clone().ok_or("ffmpeg not found")?;
+        let dir = state.store.recordings_dir(&id);
+        let src = [dir.join("mix.wav"), dir.join("screen.mp4")].into_iter().find(|p| p.exists()).ok_or("this meeting has no audio")?;
+        let out_path = PathBuf::from(&out);
+        let args: Vec<String> = vec![
+            "-hide_banner".into(), "-loglevel".into(), "error".into(), "-i".into(), src.to_string_lossy().into_owned(),
+            "-vn".into(), "-ac".into(), "1".into(), "-c:a".into(), "libmp3lame".into(), "-b:a".into(), "64k".into(),
+            "-y".into(), out_path.to_string_lossy().into_owned(),
+        ];
+        run_ffmpeg(&ffmpeg, &args)?;
+        let segs = state.store.segments(&id).map_err(err)?;
+        let text: Vec<String> = segs.iter().map(|s| hark_llm::summary::transcript_line(s.start_ms, s.speaker.as_deref(), s.clean_text.as_deref().unwrap_or(&s.text))).collect();
+        if !text.is_empty() {
+            let _ = std::fs::write(out_path.with_extension("txt"), text.join("\n"));
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // ---- shares ----
 
 #[derive(Serialize)]

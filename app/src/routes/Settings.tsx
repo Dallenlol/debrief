@@ -6,6 +6,7 @@ import { TemplatesEditor } from "@/components/TemplatesEditor";
 import { Button, Card, Input, Meter, SectionTitle, Select, Spinner, Toggle } from "@/components/ui";
 import { appLabel, fmtBytes } from "@/lib/format";
 import { LANGUAGES } from "@/lib/languages";
+import { useTheme } from "@/lib/theme";
 import { checkForUpdate } from "@/lib/updates";
 import { cmd, subscribe, type AudioDevice, type Hardware, type ModelRow, type Settings, type ShareInfo, type Tier } from "@/lib/ipc";
 
@@ -100,10 +101,19 @@ export function SettingsPage() {
       <header className="mb-8 flex items-end justify-between">
         <div>
           <h1 className="font-serif text-[34px] leading-none tracking-tight">Settings</h1>
-          <p className="mt-1.5 text-[13px] text-ink-3">Everything stays on this computer.</p>
+          <p className="mt-1.5 text-[13px] text-ink-3">
+            {s.llm_backend === "cloud" ? "Recordings stay on this computer; transcripts go to your cloud AI provider when it writes or answers." : "Everything stays on this computer."}
+          </p>
         </div>
         <span className="text-[12px] text-moss">{saved}</span>
       </header>
+
+      <section className="mb-10">
+        <SectionTitle>Appearance</SectionTitle>
+        <Card className="px-5 py-4">
+          <AppearancePicker />
+        </Card>
+      </section>
 
       <section className="mb-10">
         <SectionTitle>Audio</SectionTitle>
@@ -149,7 +159,7 @@ export function SettingsPage() {
       <section className="mb-10">
         <SectionTitle>Detection</SectionTitle>
         <Card className="divide-y divide-line px-5">
-          <Toggle label="Offer to record when a call is detected" description="Hark only shows a popup. It never records without you clicking Record." checked={s.detection_enabled} onChange={(v) => void update({ detection_enabled: v })} />
+          <Toggle label="Offer to record when a call is detected" description="Debrief only shows a popup. It never records without you clicking Record." checked={s.detection_enabled} onChange={(v) => void update({ detection_enabled: v })} />
           <Toggle label="Also detect by audio activity" description="Catches apps we don't know about when both mic and speakers are active." checked={s.audio_activity_enabled} onChange={(v) => void update({ audio_activity_enabled: v })} />
           <div className="py-4">
             <span className="mb-1 block text-[12px] font-medium text-ink-2">Global hotkey (start / stop)</span>
@@ -247,10 +257,11 @@ export function SettingsPage() {
         <Card className="divide-y divide-line px-5">
           <div className="py-4">
             <span className="mb-2 block text-[12px] font-medium text-ink-2">Language model runs...</span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {([
-                ["bundled", "Inside Hark", "Built-in llama.cpp with the downloaded model. Nothing to install."],
-                ["openai", "On an endpoint I run", "Ollama, LM Studio or any OpenAI-compatible server on this machine or your network."],
+                ["bundled", "On this computer", "The downloaded local model. Private and free, slower on long calls."],
+                ["cloud", "Cloud AI", "Claude, OpenAI or OpenRouter with your API key. Faster and smarter; the local model steps in when offline."],
+                ["openai", "An endpoint I run", "Ollama, LM Studio or any OpenAI-compatible server on this machine or your network."],
               ] as const).map(([v, title, body]) => (
                 <button
                   key={v}
@@ -262,6 +273,7 @@ export function SettingsPage() {
                 </button>
               ))}
             </div>
+            {s.llm_backend === "cloud" && <CloudAi s={s} update={update} />}
             {s.llm_backend === "openai" && (
               <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
                 <Input value={s.llm_endpoint} placeholder="http://localhost:11434/v1" onChange={(e) => setS({ ...s, llm_endpoint: e.target.value })} onBlur={() => void update({ llm_endpoint: s.llm_endpoint })} className="font-mono text-[12px]" />
@@ -301,7 +313,7 @@ export function SettingsPage() {
         <SectionTitle hint="Names recordings after the event you are in and seeds attendees">Calendar</SectionTitle>
         <Card className="px-5 py-4 text-[13px]">
           <p className="text-ink-3">
-            Paste a private .ics link (Google Calendar: Settings &rarr; your calendar &rarr; "Secret address in iCal format"; Outlook: Settings &rarr; Shared calendars &rarr; Publish) or a path to an .ics file. Hark fetches only these addresses, every {s.calendar_refresh_min} minutes.
+            Paste a private .ics link (Google Calendar: Settings &rarr; your calendar &rarr; "Secret address in iCal format"; Outlook: Settings &rarr; Shared calendars &rarr; Publish) or a path to an .ics file. Debrief fetches only these addresses, every {s.calendar_refresh_min} minutes.
           </p>
           <textarea
             value={calendarDraft}
@@ -343,7 +355,7 @@ export function SettingsPage() {
         <Card className="divide-y divide-line px-5 text-[13px]">
           <Toggle label="Check for updates on startup" description="Fetches one small file from GitHub releases. Installing is always your click." checked={s.auto_update_check} onChange={(v) => void update({ auto_update_check: v })} />
           <div className="flex items-center gap-3 py-4">
-            <Button variant="outline" size="sm" onClick={() => { setUpdateMsg("Checking..."); void checkForUpdate().then((u) => setUpdateMsg(u ? `Hark ${u.version} is available.` : "You are on the latest version.")); }}>Check for updates</Button>
+            <Button variant="outline" size="sm" onClick={() => { setUpdateMsg("Checking..."); void checkForUpdate().then((u) => setUpdateMsg(u ? `Debrief ${u.version} is available.` : "You are on the latest version.")); }}>Check for updates</Button>
             <span className="text-ink-3">{updateMsg}</span>
           </div>
         </Card>
@@ -362,12 +374,12 @@ export function SettingsPage() {
             <div className="flex shrink-0 gap-2">
               <Button variant="outline" size="sm" onClick={() => data && void openPath(data.data_dir)}>Open folder</Button>
               <Button variant="outline" size="sm" onClick={() => void (async () => {
-                const dir = await open({ directory: true, title: "Choose the new Hark data folder" });
+                const dir = await open({ directory: true, title: "Choose the new Debrief data folder" });
                 if (!dir) return;
                 setDataMsg("Copying...");
                 try {
                   const to = await cmd.changeDataDir(dir as string);
-                  setDataMsg(`Copied to ${to}. Restart Hark to use it; the old folder was left in place.`);
+                  setDataMsg(`Copied to ${to}. Restart Debrief to use it; the old folder was left in place.`);
                 } catch (e) {
                   setDataMsg(String(e));
                 }
@@ -377,7 +389,7 @@ export function SettingsPage() {
           <div className="flex flex-wrap items-center gap-2 py-4">
             <span className="mr-2 text-ink-2">Move meetings between computers:</span>
             <Button variant="outline" size="sm" onClick={() => void (async () => {
-              const out = await save({ defaultPath: "hark-library.hark", filters: [{ name: "Hark bundle", extensions: ["hark"] }] });
+              const out = await save({ defaultPath: "debrief-library.debrief", filters: [{ name: "Debrief bundle", extensions: ["debrief"] }] });
               if (!out) return;
               setDataMsg("Exporting...");
               try {
@@ -388,7 +400,7 @@ export function SettingsPage() {
               }
             })()}>Export everything</Button>
             <Button variant="outline" size="sm" onClick={() => void (async () => {
-              const p = await open({ filters: [{ name: "Hark bundle", extensions: ["hark"] }], multiple: false });
+              const p = await open({ filters: [{ name: "Debrief bundle", extensions: ["debrief", "hark"] }], multiple: false });
               if (!p) return;
               setDataMsg("Importing...");
               try {
@@ -424,7 +436,7 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      <p className="text-[12px] text-ink-3">Hark 0.1.0. Open source, MIT. No accounts, no telemetry, no cloud.</p>
+      <p className="text-[12px] text-ink-3">Debrief. Open source, MIT. No accounts, no telemetry; the cloud is used only if you add an AI key.</p>
     </div>
   );
 }
@@ -440,5 +452,102 @@ function ModelPick({ label, value, options, onChange }: { label: string; value: 
         ))}
       </Select>
     </label>
+  );
+}
+
+const CLOUD_PROVIDERS = [
+  { id: "anthropic", label: "Claude (Anthropic)", keyHint: "sk-ant-...", url: "console.anthropic.com" },
+  { id: "openai", label: "OpenAI", keyHint: "sk-...", url: "platform.openai.com" },
+  { id: "openrouter", label: "OpenRouter", keyHint: "sk-or-...", url: "openrouter.ai/keys" },
+] as const;
+
+function CloudAi({ s, update }: { s: Settings; update: (patch: Partial<Settings>) => unknown }) {
+  const [key, setKey] = useState(s.cloud_api_key ?? "");
+  const [list, setList] = useState<{ id: string; context: number | null }[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+  const provider = CLOUD_PROVIDERS.find((p) => p.id === s.cloud_provider) ?? CLOUD_PROVIDERS[0];
+  useEffect(() => setKey(s.cloud_api_key ?? ""), [s.cloud_api_key]);
+  useEffect(() => setList([]), [s.cloud_provider]);
+
+  const load = () => {
+    setMsg("Checking the key...");
+    cmd.listCloudModels(s.cloud_provider, key).then(
+      (models) => {
+        setList(models);
+        setMsg(`Key works. ${models.length} models available.`);
+      },
+      (e) => setMsg(`That did not work: ${e}`),
+    );
+  };
+  const options = list.length ? list : s.cloud_model ? [{ id: s.cloud_model, context: s.cloud_context_tokens }] : [];
+
+  return (
+    <div className="mt-3 grid gap-2">
+      <div className="grid grid-cols-[180px_1fr_auto] gap-2">
+        <Select value={s.cloud_provider} onChange={(e) => void update({ cloud_provider: e.target.value, cloud_model: "", cloud_context_tokens: null })}>
+          {CLOUD_PROVIDERS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </Select>
+        <Input
+          value={key}
+          type="password"
+          placeholder={`API key (${provider.keyHint}) from ${provider.url}`}
+          onChange={(e) => setKey(e.target.value)}
+          onBlur={() => void update({ cloud_api_key: key.trim() || null })}
+          className="font-mono text-[12px]"
+        />
+        <Button variant="outline" size="md" onClick={load} disabled={!key.trim()}>
+          Load models
+        </Button>
+      </div>
+      <Select
+        value={s.cloud_model}
+        onChange={(e) => {
+          const m = options.find((o) => o.id === e.target.value);
+          void update({ cloud_model: e.target.value, cloud_context_tokens: m?.context ?? null });
+        }}
+      >
+        <option value="">{s.cloud_provider === "anthropic" ? "Default (Claude Opus 5.5)" : "Pick a model (load the list first)"}</option>
+        {options.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.id}
+            {m.context ? ` - ${Math.round(m.context / 1000)}k context` : ""}
+          </option>
+        ))}
+      </Select>
+      {msg && <div className="text-[12px] text-ink-2">{msg}</div>}
+      <p className="text-[12px] text-ink-3">
+        Summaries, titles, follow-ups and Ask all use this model. Long calls are sent whole when they fit, so answers cover the entire
+        meeting. The key is stored in Debrief&apos;s database on this computer.
+      </p>
+    </div>
+  );
+}
+
+function AppearancePicker() {
+  const [theme, setTheme] = useTheme();
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <div className="text-[13px] font-semibold">Theme</div>
+        <div className="text-[12px] text-ink-3">Applies to every Debrief window. The moon or sun beside the logo switches it too.</div>
+      </div>
+      <div role="radiogroup" aria-label="Theme" className="flex rounded-lg border border-line bg-canvas-2 p-0.5">
+        {(["light", "dark"] as const).map((t) => (
+          <button
+            key={t}
+            role="radio"
+            aria-checked={theme === t}
+            onClick={() => setTheme(t)}
+            className={`focus-ring rounded-md px-3.5 py-1.5 text-[12px] font-semibold capitalize transition-colors ${theme === t ? "bg-canvas text-ink shadow-card" : "text-ink-3 hover:text-ink"}`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

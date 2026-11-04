@@ -100,7 +100,7 @@ export interface SearchHit {
   snippet: string;
 }
 
-export type VideoTarget = { kind: "monitor"; index: number } | { kind: "window"; title: string };
+export type VideoTarget = { kind: "monitor"; index: number } | { kind: "window"; title: string; hwnd?: number };
 export type Tier = "cpu_low" | "cpu_high" | "gpu";
 
 export interface VideoSource {
@@ -132,7 +132,11 @@ export interface Settings {
   never_apps: string[];
   popup_timeout_secs: number;
   close_to_tray: boolean;
-  llm_backend: "bundled" | "openai";
+  llm_backend: "bundled" | "cloud" | "openai";
+  cloud_provider: string;
+  cloud_api_key: string | null;
+  cloud_model: string;
+  cloud_context_tokens: number | null;
   llm_endpoint: string;
   llm_endpoint_model: string;
   llm_api_key: string | null;
@@ -324,6 +328,7 @@ export const cmd = {
   listKnownSpeakers: () => invoke<Speaker[]>("list_known_speakers"),
   deleteKnownSpeaker: (id: string) => invoke<void>("delete_known_speaker", { id }),
   rerunCleanup: (id: string) => invoke<void>("rerun_cleanup", { id }),
+  listCloudModels: (provider: string, apiKey: string) => invoke<{ id: string; context: number | null }[]>("list_cloud_models", { provider, apiKey }),
   testLlmEndpoint: (url: string, apiKey: string | null, model: string) =>
     invoke<string[]>("test_llm_endpoint", { url, apiKey, model }),
 
@@ -353,6 +358,7 @@ export const cmd = {
   tagMeeting: (id: string, name: string) => invoke<Tag>("tag_meeting", { id, name }),
   untagMeeting: (id: string, tagId: string) => invoke<void>("untag_meeting", { id, tagId }),
   exportClip: (id: string, startMs: number, endMs: number, out: string) => invoke<string>("export_clip", { id, startMs, endMs, out }),
+  exportAudio: (id: string, out: string) => invoke<string>("export_audio", { id, out }),
   createShare: (id: string, startMs?: number, endMs?: number) => invoke<ShareInfo>("create_share", { id, startMs, endMs }),
   listShares: () => invoke<ShareInfo[]>("list_shares"),
   setShareEnabled: (token: string, enabled: boolean) => invoke<void>("set_share_enabled", { token, enabled }),
@@ -394,6 +400,7 @@ export interface Events {
   notice: { level: "info" | "warning" | "error"; message: string };
   chat_token: { chat_id: string; message_id: string; delta: string };
   chat_done: { chat_id: string; message: ChatMessage; error: string | null };
+  chat_status: { chat_id: string; message_id: string; text: string };
   participants: ParticipantsPayload;
 }
 

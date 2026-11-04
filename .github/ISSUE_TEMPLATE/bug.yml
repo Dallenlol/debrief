@@ -4,7 +4,7 @@ labels: [bug]
 body:
   - type: input
     id: version
-    attributes: { label: Hark version and OS, placeholder: "0.1.0, Windows 11 / macOS 15" }
+    attributes: { label: Debrief version and OS, placeholder: "0.1.0, Windows 11 / macOS 15" }
     validations: { required: true }
   - type: textarea
     id: what

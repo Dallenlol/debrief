@@ -79,7 +79,7 @@ export function Onboarding({ onDone }: { onDone?: () => void }) {
 
         {step === 0 && (
           <div className="rise">
-            <h1 className="font-serif text-[40px] leading-none tracking-tight">Hark is listening for you, not to you.</h1>
+            <h1 className="font-serif text-[40px] leading-none tracking-tight">Debrief is listening for you, not to you.</h1>
             <p className="mt-3 text-[15px] text-ink-2">Recordings, transcripts and AI all stay on this computer. Let's check your microphone and system audio.</p>
             <Card className="mt-6 p-5">
               <Meter db={levels[0]} label="Mic" />
@@ -140,7 +140,7 @@ export function Onboarding({ onDone }: { onDone?: () => void }) {
           <div className="rise">
             <h1 className="font-serif text-[40px] leading-none tracking-tight">Download the models.</h1>
             <p className="mt-3 text-[15px] text-ink-2">
-              One-time download from Hugging Face, verified by checksum. Start with the essentials ({fmtBytes(bytes(essentials))}) and record right away; the bigger models ({fmtBytes(bytes(later))}) finish in the background and Hark catches up on clean-up and summaries by itself.
+              One-time download from Hugging Face, verified by checksum. Start with the essentials ({fmtBytes(bytes(essentials))}) and record right away; the bigger models ({fmtBytes(bytes(later))}) finish in the background and Debrief catches up on clean-up and summaries by itself.
             </p>
             <Card className="mt-6 divide-y divide-line px-5">
               {needed.length === 0 && <div className="py-6"><Spinner /></div>}
@@ -187,7 +187,7 @@ export function Onboarding({ onDone }: { onDone?: () => void }) {
                     void finish();
                   }}
                 >
-                  {allPresent ? "Open Hark" : essentialsPresent ? "Open Hark, finish the rest in the background" : "Skip for now"} <ArrowRight size={16} />
+                  {allPresent ? "Open Debrief" : essentialsPresent ? "Open Debrief, finish the rest in the background" : "Skip for now"} <ArrowRight size={16} />
                 </Button>
               )}
             </div>

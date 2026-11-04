@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Draw the Hark app icon (1024x1024 PNG), the source every platform icon is built from.
+"""Draw the Debrief app icon (1024x1024 PNG), the source every platform icon is built from.
 
     python scripts/make-icons.py            # writes assets/icon.png (the 1024 master)
     python scripts/make-icons.py --tauri    # ... and regenerates every platform icon
 
-The mark: two level-meter bars standing as the stems of an H, crossed in ember.
+The mark: a level-meter bar standing as the spine of a D, its bowl drawn in ember.
 `assets/logo.svg` draws the same geometry with the same constants - keep them in
 step if you change one. Needs only Pillow.
 """
@@ -27,9 +27,9 @@ TILE_INSET = 88
 TILE_RADIUS = 190
 STEM_W = 78
 STEM_H = 440
-GAP = 116          # stem centre to tile centre
-CROSSBAR_H = 56
-CROSSBAR_RISE = 14  # crossbars sit a touch above the true centre or they look low
+BOWL_RX = 236      # horizontal reach of the bowl's centre line from the spine
+# The glyph (spine's left edge to bowl's right edge) is centred on the tile.
+SPINE_X = 512 - BOWL_RX / 2
 
 # --- colours: the app's own tokens, converted from oklch to sRGB ---
 def oklch_to_rgb(l: float, c: float, h_deg: float) -> tuple[int, int, int]:
@@ -67,23 +67,25 @@ def draw(size: int = SIZE) -> Image.Image:
         fill=INK + (255,),
     )
 
-    cx = cy = SIZE / 2
+    cy = SIZE / 2
     half = STEM_W / 2
+    ry = (STEM_H - STEM_W) / 2  # bowl centre line meets the spine's top and bottom
 
-    # Two level-meter bars standing as the stems of an H.
-    for x in (cx - GAP, cx + GAP):
-        d.rounded_rectangle(
-            [(x - half) * k, (cy - STEM_H / 2) * k, (x + half) * k, (cy + STEM_H / 2) * k],
-            radius=half * k,
-            fill=PAPER + (255,),
-        )
-
-    # The crossbar butts into both stems (square ends, so the colour change lands
-    # exactly on the stem edge) and rides slightly high, as crossbars do.
-    y = cy - CROSSBAR_RISE
-    d.rectangle(
-        [(cx - GAP + half - 1) * k, (y - CROSSBAR_H / 2) * k, (cx + GAP - half + 1) * k, (y + CROSSBAR_H / 2) * k],
+    # The bowl: the right half of an ellipse, stroked in ember. Drawn first so the
+    # spine covers its butt ends and the colour change lands on the spine's edge.
+    d.arc(
+        [(SPINE_X - BOWL_RX - half) * k, (cy - ry - half) * k, (SPINE_X + BOWL_RX + half) * k, (cy + ry + half) * k],
+        start=-90,
+        end=90,
         fill=EMBER + (255,),
+        width=round(STEM_W * k),
+    )
+
+    # The spine: a level-meter bar, as in the meters the app shows while recording.
+    d.rounded_rectangle(
+        [(SPINE_X - half) * k, (cy - STEM_H / 2) * k, (SPINE_X + half) * k, (cy + STEM_H / 2) * k],
+        radius=half * k,
+        fill=PAPER + (255,),
     )
 
     return img.resize((size, size), Image.LANCZOS)

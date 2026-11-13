@@ -1,7 +1,7 @@
 # Hark — Design Spec
 
 **Date:** 2026-09-13
-**Status:** Approved by owner (Alex), pre-implementation
+**Status:** Approved by owner, pre-implementation
 
 ## 1. Summary
 

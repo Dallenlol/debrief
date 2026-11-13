@@ -22,6 +22,8 @@ Debrief is a desktop app for Windows and macOS. It notices when you're in a call
 | Where recordings live | Your computer | Their cloud | Their cloud | Their cloud |
 | Works offline | Yes | No | No | No |
 | Open source | Yes | No | No | No |
+
+<sub>Competitor details from their public websites as of November 2026; corrections welcome in an issue. Otter.ai, Fathom and Fireflies.ai are trademarks of their respective owners. Debrief is an independent project, not affiliated with or endorsed by them.</sub>
 | Bring your own AI | Local model, or Claude/OpenAI/OpenRouter key | No | No | No |
 
 ## Features

@@ -512,7 +512,7 @@ fn run_diarize_sidecar(state: &AppState, wav: &Path) -> Result<DiarizeOutput, St
         .map(|&(start, end)| {
             let (bin, seg, emb, wav) = (bin.clone(), seg.clone(), emb.clone(), wav.to_path_buf());
             std::thread::spawn(move || -> Result<DiarizeOutput, String> {
-                let mut cmd = hark_capture::hidden_command(&bin);
+                let mut cmd = hark_capture::background_command(&bin);
                 cmd.arg("--seg").arg(&seg).arg("--emb").arg(&emb).arg("--wav").arg(&wav).arg("--threads").arg(threads.to_string());
                 cmd.arg("--start-ms").arg(start.to_string()).arg("--end-ms").arg(end.to_string());
                 let out = cmd.stdin(std::process::Stdio::null()).output().map_err(|e| format!("spawn sidecar: {e}"))?;

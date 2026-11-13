@@ -9,3 +9,6 @@ GGML_AVX = "ON"
 GGML_AVX2 = "ON"
 GGML_FMA = "ON"
 GGML_F16C = "ON"
+# The cmake crate drops /O2 from MSVC Release builds under the Visual Studio generator;
+# this include puts it back (no-op on other compilers). See the file for details.
+CMAKE_PROJECT_INCLUDE = { value = "cmake/msvc-release-flags.cmake", relative = true }

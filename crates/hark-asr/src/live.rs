@@ -13,6 +13,8 @@ use std::thread::JoinHandle;
 pub const HZ: usize = 16_000;
 /// Re-transcribe after this much new audio.
 pub const STEP_S: f32 = 2.0;
+/// On a GPU a pass takes ~150 ms, so the line can refine twice as often.
+pub const STEP_GPU_S: f32 = 1.0;
 /// Commit no matter what once the buffer is this long.
 pub const MAX_S: f32 = 15.0;
 /// A pause this long at the end of the buffer ends the utterance.
@@ -40,7 +42,7 @@ impl LiveTranscriber {
             .spawn(move || {
                 let mut st = LiveState::new(lang);
                 let mut since_step = 0usize;
-                let step = (STEP_S * HZ as f32) as usize;
+                let step = ((if engine.is_gpu() { STEP_GPU_S } else { STEP_S }) * HZ as f32) as usize;
                 for pcm in rx.iter() {
                     // Drain everything queued so we never fall further behind than one step.
                     let mut merged = pcm;
@@ -143,6 +145,49 @@ pub fn plan(buf: &[f32], flush: bool) -> Plan {
 }
 
 fn run_pass(engine: &WhisperEngine, st: &mut LiveState, flush: bool, tx: &Sender<Caption>) -> Result<(), ()> {
+    // A pause inside the buffer ends that utterance even though no pass landed on it: commit
+    // everything up to it now instead of waiting for the next pause or the 15 s cap.
+    if let Some(cut) = inner_pause(&st.buf) {
+        let rest = st.buf.split_off(cut);
+        let committed = transcribe_buffer(engine, st, true, tx);
+        if st.buf.is_empty() {
+            st.buf = rest; // committed: `base` already moved past the head
+        } else {
+            // Not committed (transcription error left it in place): keep the audio together.
+            st.buf.extend(rest);
+        }
+        committed?;
+    }
+    transcribe_buffer(engine, st, flush, tx)
+}
+
+/// Where the last pause inside `buf` ends, when it is followed by more audio (a pause at the
+/// very end is `plan`'s job) and preceded by at least a second of audio.
+pub fn inner_pause(buf: &[f32]) -> Option<usize> {
+    const FRAME: usize = HZ / 10;
+    let need = (PAUSE_S * 10.0).ceil() as usize; // frames of silence
+    let frames = buf.len() / FRAME;
+    let silent: Vec<bool> = (0..frames).map(|i| rms_db(&buf[i * FRAME..(i + 1) * FRAME]) < GATE_DB).collect();
+    let mut i = frames;
+    while i > 0 {
+        i -= 1;
+        if !silent[i] {
+            continue;
+        }
+        let end = i + 1;
+        while i > 0 && silent[i - 1] {
+            i -= 1;
+        }
+        let (start, len) = (i, end - i);
+        // Followed by speech (not the tail), long enough, with real audio before it.
+        if end < frames && len >= need && start * FRAME >= HZ && silent[..start].iter().any(|s| !s) {
+            return Some(end * FRAME);
+        }
+    }
+    None
+}
+
+fn transcribe_buffer(engine: &WhisperEngine, st: &mut LiveState, flush: bool, tx: &Sender<Caption>) -> Result<(), ()> {
     match plan(&st.buf, flush) {
         Plan::Silence => {
             // Long stretches of nothing are discarded so the next utterance starts fresh.
@@ -323,6 +368,23 @@ mod tests {
         assert_eq!(plan(&paused, false), Plan::Commit);
         assert_eq!(plan(&tone(MAX_S + 0.5, 0.3), false), Plan::Commit);
         assert_eq!(plan(&tone(2.0, 0.3), true), Plan::Commit); // flush at stop
+    }
+
+    #[test]
+    fn a_pause_inside_the_buffer_is_found() {
+        let mut b = tone(3.0, 0.3);
+        b.extend(vec![0.0; HZ]); // 1 s pause
+        b.extend(tone(2.0, 0.3));
+        let cut = inner_pause(&b).expect("pause between two sentences");
+        assert_eq!(cut, 4 * HZ);
+        assert_eq!(inner_pause(&tone(5.0, 0.3)), None, "no pause");
+        let mut tail = tone(3.0, 0.3);
+        tail.extend(vec![0.0; HZ]);
+        assert_eq!(inner_pause(&tail), None, "a pause at the end is plan()'s commit");
+        let mut short = tone(3.0, 0.3);
+        short.extend(vec![0.0; HZ / 2]); // 0.5 s: a breath, not the end of an utterance
+        short.extend(tone(2.0, 0.3));
+        assert_eq!(inner_pause(&short), None);
     }
 
     #[test]

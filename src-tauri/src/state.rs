@@ -142,6 +142,24 @@ impl AppState {
         candidates.into_iter().find_map(|m| self.whisper(&m.id))
     }
 
+    /// The live-caption engine: `preferred` if downloaded, else the smallest downloaded speech
+    /// model. Live passes run every second or two, so a small model beats a big one here (the
+    /// transcript you keep comes from the full pass after the call).
+    pub fn whisper_live(&self, preferred: &str) -> Option<Arc<WhisperEngine>> {
+        if let Some(w) = self.whisper(preferred) {
+            return Some(w);
+        }
+        let dir = self.models_dir();
+        let mut candidates: Vec<&hark_models::ModelSpec> = self
+            .catalog
+            .all()
+            .iter()
+            .filter(|m| m.kind == hark_models::ModelKind::Asr && hark_models::is_present(&dir, m))
+            .collect();
+        candidates.sort_by_key(|m| m.size_bytes);
+        candidates.into_iter().find_map(|m| self.whisper(&m.id))
+    }
+
     /// Paths needed to run the diarization sidecar, if the models are downloaded.
     pub fn diarize_models(&self) -> Option<(PathBuf, PathBuf)> {
         Some((self.model_file("pyannote-seg-3")?, self.model_file("titanet-small")?))
@@ -266,7 +284,16 @@ impl AppState {
     /// RAII marker: engines stay loaded while any `BusyGuard` is alive.
     pub fn busy_guard(&self) -> BusyGuard<'_> {
         self.busy.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.refresh_priority();
         BusyGuard(self)
+    }
+
+    /// Crunching a finished meeting (transcription, AI) runs at below-normal priority so the
+    /// rest of the computer stays responsive; while recording, everything runs at normal
+    /// priority so audio capture is never starved.
+    pub fn refresh_priority(&self) {
+        let background = self.busy.load(std::sync::atomic::Ordering::SeqCst) > 0 && self.recording.lock().is_none();
+        set_background_priority(background);
     }
 
     pub fn unload_engines(&self) {
@@ -312,8 +339,20 @@ impl Drop for BusyGuard<'_> {
     fn drop(&mut self) {
         self.0.busy.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         self.0.engines.lock().last_used = Some(Instant::now());
+        self.0.refresh_priority();
     }
 }
+
+#[cfg(windows)]
+fn set_background_priority(background: bool) {
+    use windows::Win32::System::Threading::{GetCurrentProcess, SetPriorityClass, BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS};
+    let class = if background { BELOW_NORMAL_PRIORITY_CLASS } else { NORMAL_PRIORITY_CLASS };
+    // SAFETY: GetCurrentProcess returns a pseudo-handle that needs no closing.
+    let _ = unsafe { SetPriorityClass(GetCurrentProcess(), class) };
+}
+
+#[cfg(not(windows))]
+fn set_background_priority(_background: bool) {}
 
 /// Cache-key tag for a secret: changes when the key changes, without keeping it in the key.
 fn secret_tag(k: Option<&str>) -> u64 {

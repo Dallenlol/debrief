@@ -81,8 +81,12 @@ pub fn run() {
                 log::warn!("asset scope: {e}");
             }
             log::info!("Debrief started; data dir {}", hark_store::data_dir().display());
-            if handle.state::<AppState>().ffmpeg.is_none() {
-                log::warn!("ffmpeg sidecar not found; screen video disabled");
+            match handle.state::<AppState>().ffmpeg.clone() {
+                // Probe the hardware video encoder now, so pressing Record never waits on it.
+                Some(ff) => {
+                    std::thread::spawn(move || hark_capture::video::pick_encoder(&ff));
+                }
+                None => log::warn!("ffmpeg sidecar not found; screen video disabled"),
             }
             if std::env::var_os("HARK_SMOKE").is_some() {
                 smoke::run(handle);
@@ -188,7 +192,7 @@ fn spawn_engine_idle_unloader(app: tauri::AppHandle) {
         if state.recording.lock().is_some() || state.busy.load(std::sync::atomic::Ordering::SeqCst) > 0 {
             continue;
         }
-        let idle = state.engines.lock().last_used.map(|t| t.elapsed() > std::time::Duration::from_secs(600)).unwrap_or(false);
+        let idle = state.engines.lock().last_used.map(|t| t.elapsed() > std::time::Duration::from_secs(180)).unwrap_or(false);
         if idle {
             log::info!("unloading idle AI engines");
             state.unload_engines();

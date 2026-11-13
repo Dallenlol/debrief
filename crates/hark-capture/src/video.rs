@@ -42,6 +42,64 @@ pub fn hidden_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     cmd
 }
 
+/// Like [`hidden_command`], at below-normal CPU priority: for background work (screen
+/// encoding, speaker detection) that must never slow down the call or whatever the user is doing.
+pub fn background_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    #[allow(unused_mut)]
+    let mut cmd = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+        cmd.creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
+    }
+    cmd
+}
+
+/// H.264 encoder for screen video. A hardware encoder (GPU media block) costs almost no CPU;
+/// libx264 is the fallback when none works on this machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum H264 {
+    Nvenc,
+    Amf,
+    Qsv,
+    X264,
+}
+
+impl H264 {
+    fn args(self) -> Vec<String> {
+        let a: &[&str] = match self {
+            H264::Nvenc => &["-c:v", "h264_nvenc", "-preset", "p2", "-tune", "ll", "-rc", "vbr", "-cq", "30", "-b:v", "0"],
+            H264::Amf => &["-c:v", "h264_amf", "-usage", "lowlatency", "-quality", "speed", "-rc", "cqp", "-qp_i", "26", "-qp_p", "30"],
+            H264::Qsv => &["-c:v", "h264_qsv", "-preset", "veryfast", "-global_quality", "28"],
+            // fable: 4 threads keeps a software encode to a few cores; quality ceiling is "superfast".
+            H264::X264 => &["-c:v", "libx264", "-preset", "superfast", "-crf", "28", "-threads", "4"],
+        };
+        a.iter().map(|s| s.to_string()).collect()
+    }
+}
+
+static ENCODER: std::sync::OnceLock<H264> = std::sync::OnceLock::new();
+
+/// The best H.264 encoder that actually works here (probed once per run with a tiny encode).
+pub fn pick_encoder(ffmpeg: &Path) -> H264 {
+    *ENCODER.get_or_init(|| {
+        for e in [H264::Nvenc, H264::Amf, H264::Qsv] {
+            let mut cmd = hidden_command(ffmpeg);
+            cmd.args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=s=640x360:r=15:d=0.4", "-pix_fmt", "yuv420p"]);
+            cmd.args(e.args()).args(["-f", "null", "-"]);
+            let ok = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().map(|s| s.success()).unwrap_or(false);
+            if ok {
+                tracing::info!("screen video: hardware encoder {e:?}");
+                return e;
+            }
+        }
+        tracing::info!("screen video: no hardware encoder; using libx264");
+        H264::X264
+    })
+}
+
 /// Scale to at most `max_height`, keeping both sides even (libx264 + yuv420p refuse odd sizes,
 /// and a window can be any size).
 fn scale_filter(max_height: u32) -> String {
@@ -66,36 +124,23 @@ fn filter_quote(v: &str) -> String {
     format!("'{}'", v.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
-fn common_encode_args(out: &Path, max_height: u32) -> Vec<String> {
+fn common_encode_args(out: &Path, max_height: u32, enc: H264) -> Vec<String> {
     let mut v = vec!["-vf".into(), scale_filter(max_height)];
-    v.extend(encode_tail(out));
+    v.extend(encode_tail(out, enc));
     v
 }
 
-fn encode_tail(out: &Path) -> Vec<String> {
-    vec![
-        "-c:v".into(),
-        "libx264".into(),
-        "-preset".into(),
-        "veryfast".into(),
-        "-crf".into(),
-        "28".into(),
-        "-pix_fmt".into(),
-        "yuv420p".into(),
-        "-an".into(),
-        "-movflags".into(),
-        "+frag_keyframe+empty_moov+default_base_moof".into(),
-        "-f".into(),
-        "mp4".into(),
-        "-y".into(),
-        out.to_string_lossy().into_owned(),
-    ]
+fn encode_tail(out: &Path, enc: H264) -> Vec<String> {
+    let mut v = enc.args();
+    v.extend(["-pix_fmt", "yuv420p", "-an", "-movflags", "+frag_keyframe+empty_moov+default_base_moof", "-f", "mp4", "-y"].map(String::from));
+    v.push(out.to_string_lossy().into_owned());
+    v
 }
 
 /// ffmpeg arguments to capture `target` to a fragmented MP4 at `fps`.
 /// `monitor` is the resolved display for `VideoTarget::Monitor` (geometry on
 /// Windows, avfoundation device on macOS); `None` captures the whole desktop.
-pub fn ffmpeg_capture_args(target: &VideoTarget, monitor: Option<&MonitorInfo>, out: &Path, fps: u32, max_height: u32) -> Vec<String> {
+pub fn ffmpeg_capture_args(target: &VideoTarget, monitor: Option<&MonitorInfo>, out: &Path, fps: u32, max_height: u32, enc: H264) -> Vec<String> {
     let mut args: Vec<String> = vec!["-hide_banner".into(), "-loglevel".into(), "error".into()];
     if let (true, VideoTarget::Window { title, hwnd }) = (cfg!(windows), target) {
         // Windows.Graphics.Capture: GDI's window grab returns black frames for anything the GPU
@@ -108,7 +153,7 @@ pub fn ffmpeg_capture_args(target: &VideoTarget, monitor: Option<&MonitorInfo>, 
                 scale_filter(max_height)
             ),
         ]);
-        args.extend(encode_tail(out));
+        args.extend(encode_tail(out, enc));
         return args;
     }
     if cfg!(windows) {
@@ -149,7 +194,7 @@ pub fn ffmpeg_capture_args(target: &VideoTarget, monitor: Option<&MonitorInfo>, 
     } else {
         args.extend(["-f".into(), "x11grab".into(), "-framerate".into(), fps.to_string(), "-i".into(), ":0.0".into()]);
     }
-    args.extend(common_encode_args(out, max_height));
+    args.extend(common_encode_args(out, max_height, enc));
     args
 }
 
@@ -165,7 +210,7 @@ pub fn ffmpeg_snapshot_args(target: &VideoTarget, monitor: Option<&MonitorInfo>,
         }
         _ => {
             // Same source as the recording, then swap the encoder tail for one PNG.
-            let mut a = ffmpeg_capture_args(target, monitor, out, 1, 4320);
+            let mut a = ffmpeg_capture_args(target, monitor, out, 1, 4320, H264::X264);
             let cut = a.iter().position(|x| x == "-vf").unwrap_or(a.len());
             a.truncate(cut);
             args = a;
@@ -247,13 +292,13 @@ pub struct VideoRecorder {
     pub output: PathBuf,
 }
 
-fn spawn_capture(ffmpeg: &Path, target: &VideoTarget, out: &Path, fps: u32, max_height: u32) -> std::io::Result<Child> {
+fn spawn_capture(ffmpeg: &Path, target: &VideoTarget, out: &Path, fps: u32, max_height: u32, enc: H264) -> std::io::Result<Child> {
     let monitor = match target {
         VideoTarget::Monitor { index } => crate::monitors::list_monitors(Some(ffmpeg)).into_iter().find(|m| m.index == *index),
         VideoTarget::Window { .. } => None,
     };
-    let child = hidden_command(ffmpeg)
-        .args(ffmpeg_capture_args(target, monitor.as_ref(), out, fps, max_height))
+    let child = background_command(ffmpeg)
+        .args(ffmpeg_capture_args(target, monitor.as_ref(), out, fps, max_height, enc))
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         // Never read: a piped stderr that fills up would stall the recorder.
@@ -270,10 +315,12 @@ impl VideoRecorder {
             VideoTarget::Window { title, hwnd } if *hwnd != 0 && !window_alive(*hwnd) => VideoTarget::Window { title: title.clone(), hwnd: 0 },
             t => t.clone(),
         };
-        let child = std::sync::Arc::new(std::sync::Mutex::new(Some(spawn_capture(ffmpeg, &target, out, fps, max_height)?)));
-        if matches!(target, VideoTarget::Window { .. }) {
-            // Some windows cannot be captured (minimised, suspended store apps): ffmpeg exits at once.
-            // Then record the main screen instead, so the call still has a picture.
+        let enc = pick_encoder(ffmpeg);
+        let child = std::sync::Arc::new(std::sync::Mutex::new(Some(spawn_capture(ffmpeg, &target, out, fps, max_height, enc)?)));
+        if matches!(target, VideoTarget::Window { .. }) || enc != H264::X264 {
+            // Some windows cannot be captured (minimised, suspended store apps), and a hardware
+            // encoder can be busy (session limit): ffmpeg exits at once. Then record the main
+            // screen with the software encoder instead, so the call still has a picture.
             // fable: the fallback video starts ~1.5 s after the audio; mux does not offset for it.
             let (child, ffmpeg, out) = (child.clone(), ffmpeg.to_path_buf(), out.to_path_buf());
             std::thread::spawn(move || {
@@ -281,8 +328,8 @@ impl VideoRecorder {
                 let mut slot = child.lock().unwrap_or_else(|e| e.into_inner());
                 let Some(c) = slot.as_mut() else { return };
                 if let Ok(Some(status)) = c.try_wait() {
-                    tracing::warn!("window capture stopped at once ({status}); recording the main screen instead");
-                    match spawn_capture(&ffmpeg, &VideoTarget::Monitor { index: 0 }, &out, fps, max_height) {
+                    tracing::warn!("screen capture stopped at once ({status}); recording the main screen with libx264 instead");
+                    match spawn_capture(&ffmpeg, &VideoTarget::Monitor { index: 0 }, &out, fps, max_height, H264::X264) {
                         Ok(n) => *slot = Some(n),
                         Err(e) => tracing::warn!("screen capture fallback failed: {e}"),
                     }
@@ -354,7 +401,7 @@ fn window_alive(_hwnd: u64) -> bool {
 
 /// Run ffmpeg to completion with `args`; returns stderr on failure.
 pub fn run_ffmpeg(ffmpeg: &Path, args: &[String]) -> Result<(), String> {
-    let out = hidden_command(ffmpeg).args(args).stdin(Stdio::null()).output().map_err(|e| e.to_string())?;
+    let out = background_command(ffmpeg).args(args).stdin(Stdio::null()).output().map_err(|e| e.to_string())?;
     if out.status.success() {
         Ok(())
     } else {
@@ -384,7 +431,7 @@ mod tests {
     #[test]
     fn capture_args_use_platform_grabber_and_fragmented_mp4() {
         let out = Path::new("out.mp4");
-        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 0 }, None, out, 15, 1080);
+        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 0 }, None, out, 15, 1080, H264::X264);
         let joined = a.join(" ");
         if cfg!(windows) {
             assert!(joined.contains("-f gdigrab"));
@@ -401,8 +448,8 @@ mod tests {
 
     #[test]
     fn window_target_on_windows_uses_graphics_capture() {
-        let a = ffmpeg_capture_args(&VideoTarget::Window { title: "Zoom Meeting".into(), hwnd: 0 }, None, Path::new("o.mp4"), 10, 720).join(" ");
-        let b = ffmpeg_capture_args(&VideoTarget::Window { title: "x".into(), hwnd: 4242 }, None, Path::new("o.mp4"), 10, 720).join(" ");
+        let a = ffmpeg_capture_args(&VideoTarget::Window { title: "Zoom Meeting".into(), hwnd: 0 }, None, Path::new("o.mp4"), 10, 720, H264::X264).join(" ");
+        let b = ffmpeg_capture_args(&VideoTarget::Window { title: "x".into(), hwnd: 4242 }, None, Path::new("o.mp4"), 10, 720, H264::X264).join(" ");
         if cfg!(windows) {
             assert!(a.contains("gfxcapture=window_title='^Zoom Meeting$'") && a.contains("hwdownload,format=bgra"), "{a}");
             assert!(b.contains("gfxcapture=hwnd=4242:") && !b.contains("gdigrab"), "{b}");
@@ -414,12 +461,19 @@ mod tests {
     #[test]
     fn monitor_geometry_selects_a_region() {
         let m = MonitorInfo { index: 1, name: "DISPLAY2".into(), x: -1920, y: 0, width: 1920, height: 1080, primary: false, device: 2 };
-        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 1 }, Some(&m), Path::new("o.mp4"), 10, 720).join(" ");
+        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 1 }, Some(&m), Path::new("o.mp4"), 10, 720, H264::X264).join(" ");
         if cfg!(windows) {
             assert!(a.contains("-offset_x -1920 -offset_y 0 -video_size 1920x1080 -i desktop"));
         } else if cfg!(target_os = "macos") {
             assert!(a.contains("-i 2:none"));
         }
+    }
+
+    #[test]
+    fn hardware_encoder_replaces_x264() {
+        let a = ffmpeg_capture_args(&VideoTarget::Window { title: "x".into(), hwnd: 1 }, None, Path::new("o.mp4"), 15, 1080, H264::Nvenc).join(" ");
+        assert!(a.contains("-c:v h264_nvenc") && !a.contains("libx264") && a.contains("-pix_fmt yuv420p"), "{a}");
+        assert!(a.ends_with("-f mp4 -y o.mp4"), "{a}");
     }
 
     #[test]

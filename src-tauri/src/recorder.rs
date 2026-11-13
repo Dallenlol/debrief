@@ -33,7 +33,8 @@ pub struct ActiveRecording {
     /// Feeds live ASR; shared with the forwarder so `stop` can close it from here
     /// (the only sender) instead of waiting for the capture channel to drain.
     pcm_tx: Arc<Mutex<Option<crossbeam_channel::Sender<Vec<f32>>>>>,
-    live: Option<LiveTranscriber>,
+    /// Loads the live model and starts the transcriber; yields it (or `None`) when joined.
+    live: Option<std::thread::JoinHandle<Option<LiveTranscriber>>>,
     forwarder: Option<JoinHandle<()>>,
     forwarder_stop: Arc<AtomicBool>,
     pub highlights: Vec<u64>,
@@ -119,37 +120,41 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
     };
 
     state.store.create_meeting(&meeting).map_err(|e| e.to_string())?;
-    log::info!("recorder: audio open, loading live model");
+    log::info!("recorder: audio open");
     crate::live_feed::LiveFeed::begin(&state, &meeting.id);
     let notes_stop = Arc::new(AtomicBool::new(false));
     if settings.summary_enabled {
         crate::live_feed::spawn_notes_loop(app.clone(), meeting.id.clone(), notes_stop.clone());
     }
 
-    // Live captions if the live model is downloaded.
+    // Live captions if a speech model is downloaded. Loading it can take many seconds (a cold
+    // disk, a large model on the GPU), so it happens off the Record path: audio queues in the
+    // channel meanwhile and the captions catch up once the model is ready.
     let tier = settings.tier(&state.hardware);
     let (live_id, _, _) = settings.model_ids(&state.catalog, tier);
-    let live_engine = state.whisper_or_any(&[&live_id]);
-    log::info!("recorder: live model loaded={}", live_engine.is_some());
-    let (pcm_tx, live) = match live_engine {
-        Some(engine) => {
-            let (pcm_tx, pcm_rx) = crossbeam_channel::unbounded::<Vec<f32>>();
+    let (pcm_tx, pcm_rx) = crossbeam_channel::unbounded::<Vec<f32>>();
+    let live = {
+        let (app, lang) = (app.clone(), settings.language.clone());
+        std::thread::spawn(move || -> Option<LiveTranscriber> {
+            let state = app.state::<AppState>();
+            let started = std::time::Instant::now();
+            let Some(engine) = state.whisper_live(&live_id) else {
+                notice(&app, "info", "Live captions off: transcription model not downloaded yet.".into());
+                return None; // drops pcm_rx, so the forwarder's sends fail fast
+            };
+            log::info!("recorder: live model {} ready in {:.1}s", engine.model_id(), started.elapsed().as_secs_f32());
             let (cap_tx2, cap_rx2) = crossbeam_channel::unbounded::<Caption>();
-            let live = LiveTranscriber::start(engine, pcm_rx, cap_tx2, settings.language.clone());
-            let app2 = app.clone();
+            let live = LiveTranscriber::start(engine, pcm_rx, cap_tx2, lang);
             std::thread::spawn(move || {
                 for c in cap_rx2.iter() {
-                    crate::live_feed::LiveFeed::push(&app2.state::<AppState>(), &c);
-                    let _ = app2.emit(events::CAPTION, &c);
+                    crate::live_feed::LiveFeed::push(&app.state::<AppState>(), &c);
+                    let _ = app.emit(events::CAPTION, &c);
                 }
             });
-            (Some(pcm_tx), Some(live))
-        }
-        None => {
-            notice(app, "info", "Live captions off: transcription model not downloaded yet.".into());
-            (None, None)
-        }
+            Some(live)
+        })
     };
+    let pcm_tx = Some(pcm_tx);
 
     // Forward capture events to the UI and the live transcriber. Exits on the
     // stop flag: the capture channel may stay open while a dead stream is
@@ -195,12 +200,13 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
         recorder: Some(recorder),
         video,
         pcm_tx,
-        live,
+        live: Some(live),
         forwarder: Some(forwarder),
         forwarder_stop,
         highlights: Vec::new(),
         notes_stop,
     });
+    state.refresh_priority();
     state.detection_paused.store(true, Ordering::SeqCst);
     spawn_participant_sampler(app.clone(), meeting.id.clone(), opts.app.clone());
     log::info!("recorder: showing record bar");
@@ -413,6 +419,7 @@ pub fn mark_highlight(app: &AppHandle) -> Option<u64> {
 pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
     let state = app.state::<AppState>();
     let mut active = state.recording.lock().take().ok_or("not recording")?;
+    state.refresh_priority();
     state.detection_paused.store(false, Ordering::SeqCst);
     active.notes_stop.store(true, Ordering::Relaxed);
     windows::hide_recordbar(app);
@@ -427,7 +434,7 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
         let _ = f.join();
     }
     drop(active.pcm_tx.lock().take());
-    if let Some(l) = active.live.take() {
+    if let Some(Ok(Some(l))) = active.live.take().map(|h| h.join()) {
         l.join();
     }
 

@@ -5,12 +5,11 @@
 **Record Zoom, Microsoft Teams and Google Meet calls on your own computer. Get live captions, a speaker-labelled transcript, AI meeting notes and answers to your questions, all offline. A private, local-first alternative to Otter.ai, Fathom and Fireflies.**
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/Dallenlol/debrief?include_prereleases&sort=semver)](https://github.com/Dallenlol/debrief/releases)
 ![Windows and macOS](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
 ![Built with Rust and Tauri](https://img.shields.io/badge/built%20with-Rust%20%2B%20Tauri-orange)
 [![GitHub stars](https://img.shields.io/github/stars/Dallenlol/debrief?style=social)](https://github.com/Dallenlol/debrief/stargazers)
 
-Debrief is a desktop app for Windows and macOS. It notices when you're in a call and offers a **Record** button. It never records on its own, and no bot joins your meeting. It captures your mic plus the meeting app's audio (and the screen if you want), transcribes with [Whisper](https://github.com/ggerganov/whisper.cpp), works out who said what, and writes the summary with a local language model ([llama.cpp](https://github.com/ggerganov/llama.cpp)) or your own Claude, OpenAI or OpenRouter key. No account, no subscription, no upload.
+Debrief is a desktop app for Windows and macOS. It notices when you're in a call and offers a **Record** button. It never records on its own, and no bot joins your meeting. It captures your mic plus the meeting app's audio (and the screen if you want), transcribes with [Whisper](https://github.com/ggerganov/whisper.cpp), works out who said what, and writes the summary with a local language model ([llama.cpp](https://github.com/ggerganov/llama.cpp)) or your own Claude, OpenAI or OpenRouter key. No account, no subscription, and nothing uploaded unless you add a cloud AI key.
 
 ![Debrief meeting page: speaker-labelled transcript, summary and Ask Debrief chat](docs/img/meeting.png)
 
@@ -22,22 +21,22 @@ Debrief is a desktop app for Windows and macOS. It notices when you're in a call
 | Where recordings live | Your computer | Their cloud | Their cloud | Their cloud |
 | Works offline | Yes | No | No | No |
 | Open source | Yes | No | No | No |
-
-<sub>Competitor details from their public websites as of November 2026; corrections welcome in an issue. Otter.ai, Fathom and Fireflies.ai are trademarks of their respective owners. Debrief is an independent project, not affiliated with or endorsed by them.</sub>
 | Bring your own AI | Local model, or Claude/OpenAI/OpenRouter key | No | No | No |
+
+<sub>Competitor details summarised from their public websites; check them for current plans, and corrections are welcome in an issue. Otter.ai, Fathom and Fireflies.ai are trademarks of their respective owners. Debrief is an independent project, not affiliated with or endorsed by them.</sub>
 
 ## Features
 
 **Recording**
 - **Call detection** for Zoom, Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime, GoToMeeting, Whereby, Jitsi, Around, Skype, RingCentral and WhatsApp/Telegram/Signal calls, native or in a browser tab, plus an audio-activity fallback for anything else. It only ever shows a small **Record?** popup.
 - **Records only the meeting.** Pick the meeting window or a display. On Windows Debrief captures only that app's audio plus your mic, so music and notifications stay out.
-- **Optional screen recording** using the GPU's hardware video encoder (NVIDIA NVENC, AMD AMF, Intel Quick Sync) when there is one.
+- **Optional screen recording**, encoded on the graphics card (NVIDIA NVENC, AMD AMF, Intel Quick Sync) on Windows PCs that have one.
 - **Hard to lose a recording.** Audio is written to disk as it's captured. If a headset disconnects, Debrief switches devices and keeps going; if the app crashes, the recording is finished the next time it starts.
 
 **Transcription**
 - **Live captions** while the call runs, finalised within about two seconds of each sentence, plus running notes (topics, decisions, action items) that update every minute or two.
-- **Accurate transcript after the call** with Whisper (up to large-v3-turbo on a GPU), in English or 30 other languages.
-- **Speaker diarization** (who spoke when) that remembers voices. Name someone once and Debrief suggests them next time. Names can also come from the meeting window, your calendar or the name labels on video tiles.
+- **Accurate transcript after the call** with Whisper (up to large-v3-turbo on a GPU), in 29 languages (or auto-detect).
+- **Speaker diarization** (who spoke when) that remembers voices. Name someone once and Debrief suggests them next time. Names can also come from your calendar and, on Windows, from the meeting window and the name labels on video tiles.
 - **Imports** existing audio and video files: phone voice memos, old Zoom recordings.
 
 **AI meeting notes and search**
@@ -59,8 +58,8 @@ Debrief is a desktop app for Windows and macOS. It notices when you're in a call
 Debrief is a native Rust app built with [Tauri](https://tauri.app), not Electron.
 
 - **Idle** it's a tray icon and a 2-second window check. AI models load only when needed and are unloaded 3 minutes after the last job.
-- **While you record** the screen is encoded on the GPU's media engine when available, and live captions reuse one warm Whisper decoder instead of setting it up every few seconds.
-- **After the call** transcription, speaker detection and AI run at below-normal CPU priority, so games, calls and your browser stay smooth while it works.
+- **While you record** the screen is encoded on the graphics card's media engine when a Windows PC has one, and live captions reuse one warm Whisper decoder instead of setting it up every few seconds.
+- **After the call** transcription, speaker detection and AI run at below-normal CPU priority on Windows, so games, calls and your browser stay smooth while it works.
 - **Sized for your hardware.** It picks model sizes for your machine, and on CPU-only computers it measures each speech model's real speed and uses the best one that finishes within the recording's own length.
 
 ## Install
@@ -75,7 +74,7 @@ More detail in [docs/install.md](docs/install.md) and [Models and hardware](docs
 
 ## Privacy
 
-- **Local only.** Recordings, transcripts, summaries and chat history stay in one folder on your computer. The only network traffic is downloading AI models from Hugging Face (checked against known checksums), and the cloud AI provider if you choose to add a key.
+- **Local by default.** Recordings, transcripts, summaries and chat history stay in one folder on your computer, and all AI runs on it unless you turn on Cloud AI with your own key (then transcript text, not audio, goes to that provider). The other network connections are model downloads from Hugging Face and GitHub (checked against known checksums), the update check, calendar links you add and a webhook you set up.
 - **Manual by design.** Detection only shows a popup. Recording, naming speakers and sharing always need a click.
 
 See [docs/privacy.md](docs/privacy.md).

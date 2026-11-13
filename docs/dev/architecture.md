@@ -13,7 +13,7 @@ crates/
   hark-diarize-cli  sidecar binary: sherpa-onnx (pyannote + TitaNet) over a WAV window, JSON out
   hark-llm       llama.cpp + OpenAI-compatible backends; cleanup, summary (chunked), title, chat, follow-up email, live notes, embeddings
   hark-calendar  .ics parsing and event matching
-  hark-share     LAN share server, .hark bundles, standalone HTML export
+  hark-share     LAN share server, .debrief bundles (.hark still imports), standalone HTML export
 src-tauri/
   src/lib.rs          app builder, plugins, idle engine unloader (skips while `AppState::busy` > 0), orphan recovery on start
   src/state.rs        AppState: store, settings, engines, active recording, live feed, busy guard

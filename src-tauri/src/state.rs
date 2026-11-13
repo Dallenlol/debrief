@@ -292,6 +292,11 @@ impl AppState {
     /// rest of the computer stays responsive; while recording, everything runs at normal
     /// priority so audio capture is never starved.
     pub fn refresh_priority(&self) {
+        // Decide and apply under one lock: two callers racing (a job finishing as Record is
+        // pressed) must not apply a stale decision last. Every caller re-reads the state, so
+        // whoever runs last applies the current answer.
+        static APPLY: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+        let _g = APPLY.lock();
         let background = self.busy.load(std::sync::atomic::Ordering::SeqCst) > 0 && self.recording.lock().is_none();
         set_background_priority(background);
     }

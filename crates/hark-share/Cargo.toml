@@ -15,6 +15,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 local-ip-address = "0.6"
 serde.workspace = true
 serde_json.workspace = true
+uuid.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
 html-escape = "0.2"

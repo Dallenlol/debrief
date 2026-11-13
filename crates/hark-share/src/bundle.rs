@@ -99,6 +99,11 @@ pub fn import_bundle(store: &Store, bundle: &Path) -> Result<ImportReport> {
     let mut report = ImportReport::default();
     for bm in &manifest.meetings {
         let id = &bm.meeting.id;
+        // Ids and file names come from the bundle file: accept only what Debrief itself writes.
+        if uuid::Uuid::parse_str(id).is_err() || bm.media.iter().any(|f| !MEDIA_FILES.contains(&f.as_str())) {
+            report.errors.push(format!("{}: not a valid Debrief meeting (unexpected id or file names)", bm.meeting.title));
+            continue;
+        }
         if store.get_meeting(id)?.is_some() {
             report.skipped_existing += 1;
             continue;
@@ -184,5 +189,41 @@ mod tests {
         let r2 = import_bundle(&dst, &out).unwrap();
         assert_eq!(r2.skipped_existing, 1);
         assert_eq!(dst.list_meetings().unwrap().len(), 1);
+    }
+
+    /// A crafted bundle must not write outside the recordings folder (e.g. into Startup).
+    #[test]
+    fn crafted_bundle_cannot_escape_the_data_folder() {
+        let src_dir = tempfile::tempdir().unwrap();
+        let src = Store::open(&src_dir.path().join("hark.db")).unwrap();
+        let m = Meeting::new_recording("Evil", None);
+        src.create_meeting(&m).unwrap();
+        std::fs::write(src.recordings_dir(&m.id).join("mix.wav"), b"x").unwrap();
+        let mut manifest = export_bundle(&src, &[m.id.clone()], &src_dir.path().join("ok.debrief"), false).unwrap();
+
+        let dst_dir = tempfile::tempdir().unwrap();
+        let data = dst_dir.path().join("data");
+        let dst = Store::open(&{
+            std::fs::create_dir_all(&data).unwrap();
+            data.join("hark.db")
+        })
+        .unwrap();
+        for (id, media) in [("../../escaped", "mix.wav"), (m.id.as_str(), "../../escaped.bat")] {
+            manifest.meetings[0].meeting.id = id.to_string();
+            manifest.meetings[0].media = vec![media.to_string()];
+            let evil = src_dir.path().join("evil.debrief");
+            let mut zip = zip::ZipWriter::new(File::create(&evil).unwrap());
+            zip.start_file("manifest.json", SimpleFileOptions::default()).unwrap();
+            zip.write_all(serde_json::to_string(&manifest).unwrap().as_bytes()).unwrap();
+            zip.start_file(format!("media/{id}/{media}"), SimpleFileOptions::default()).unwrap();
+            zip.write_all(b"payload").unwrap();
+            zip.finish().unwrap();
+
+            let r = import_bundle(&dst, &evil).unwrap();
+            assert_eq!((r.imported, r.errors.len()), (0, 1), "{id} / {media} must be refused");
+        }
+        assert!(!dst_dir.path().join("escaped").exists() && !dst_dir.path().join("escaped.bat").exists());
+        assert!(!data.join("escaped.bat").exists());
+        assert!(dst.list_meetings().unwrap().is_empty());
     }
 }

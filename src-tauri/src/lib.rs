@@ -184,7 +184,7 @@ pub fn run() {
         .expect("error while running Debrief");
 }
 
-/// Free model memory after 10 minutes without use (never while recording).
+/// Free model memory after 3 minutes without use (never while recording or processing).
 fn spawn_engine_idle_unloader(app: tauri::AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_secs(60));

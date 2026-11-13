@@ -61,7 +61,7 @@ pub fn delete_meeting(state: State<AppState>, id: String) -> CmdResult<()> {
         return Err("cannot delete a meeting that is being recorded".into());
     }
     state.store.delete_meeting(&id).map_err(err)?;
-    let dir = state.store.root().join("recordings").join(&id);
+    let dir = state.store.recordings_path(&id);
     let _ = std::fs::remove_dir_all(dir);
     Ok(())
 }

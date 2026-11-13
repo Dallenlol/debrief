@@ -119,9 +119,18 @@ fn title_regex(title: &str) -> String {
     out
 }
 
-/// Value for a filter option: wrapped in quotes so ffmpeg's filter parser leaves `:` `,` `=` alone.
-fn filter_quote(v: &str) -> String {
-    format!("'{}'", v.replace('\\', "\\\\").replace('\'', "\\'"))
+/// Value for a filter option inside a filtergraph. ffmpeg unescapes twice: once for the
+/// filtergraph (`\ ' [ ] , ;`) and once for the filter's options (`\ ' :`), so escape for the
+/// options first, then for the graph. Window titles contain `:` and `'` ("Standup: Dan's call").
+fn filter_escape(v: &str) -> String {
+    let esc = |s: &str, special: &str| s.chars().fold(String::new(), |mut o, c| {
+        if special.contains(c) {
+            o.push('\\');
+        }
+        o.push(c);
+        o
+    });
+    esc(&esc(v, "\\':"), "\\'[],;")
 }
 
 fn common_encode_args(out: &Path, max_height: u32, enc: H264) -> Vec<String> {
@@ -145,7 +154,7 @@ pub fn ffmpeg_capture_args(target: &VideoTarget, monitor: Option<&MonitorInfo>, 
     if let (true, VideoTarget::Window { title, hwnd }) = (cfg!(windows), target) {
         // Windows.Graphics.Capture: GDI's window grab returns black frames for anything the GPU
         // draws (browsers, Zoom, Teams, Electron), which is nearly every meeting window.
-        let pick = if *hwnd != 0 { format!("hwnd={hwnd}") } else { format!("window_title={}", filter_quote(&title_regex(title))) };
+        let pick = if *hwnd != 0 { format!("hwnd={hwnd}") } else { format!("window_title={}", filter_escape(&title_regex(title))) };
         args.extend([
             "-filter_complex".into(),
             format!(
@@ -205,7 +214,7 @@ pub fn ffmpeg_snapshot_args(target: &VideoTarget, monitor: Option<&MonitorInfo>,
     let mut args: Vec<String> = vec!["-hide_banner".into(), "-loglevel".into(), "error".into()];
     match target {
         VideoTarget::Window { title, hwnd } if cfg!(windows) => {
-            let pick = if *hwnd != 0 { format!("hwnd={hwnd}") } else { format!("window_title={}", filter_quote(&title_regex(title))) };
+            let pick = if *hwnd != 0 { format!("hwnd={hwnd}") } else { format!("window_title={}", filter_escape(&title_regex(title))) };
             args.extend(["-filter_complex".into(), format!("gfxcapture={pick}:capture_cursor=0,hwdownload,format=bgra,{SCALE}")]);
         }
         _ => {
@@ -317,19 +326,27 @@ impl VideoRecorder {
         };
         let enc = pick_encoder(ffmpeg);
         let child = std::sync::Arc::new(std::sync::Mutex::new(Some(spawn_capture(ffmpeg, &target, out, fps, max_height, enc)?)));
-        if matches!(target, VideoTarget::Window { .. }) || enc != H264::X264 {
-            // Some windows cannot be captured (minimised, suspended store apps), and a hardware
-            // encoder can be busy (session limit): ffmpeg exits at once. Then record the main
-            // screen with the software encoder instead, so the call still has a picture.
-            // fable: the fallback video starts ~1.5 s after the audio; mux does not offset for it.
+        // ffmpeg exits at once when a hardware encoder is busy (session limit) or a window cannot
+        // be captured (minimised, suspended store apps). Try, in order: the same target with the
+        // software encoder, then (for a window) the main screen, so the call still has a picture.
+        // fable: a fallback video starts ~1.5 s after the audio; mux does not offset for it.
+        let mut fallbacks: Vec<VideoTarget> = Vec::new();
+        if enc != H264::X264 {
+            fallbacks.push(target.clone());
+        }
+        if matches!(target, VideoTarget::Window { .. }) {
+            fallbacks.push(VideoTarget::Monitor { index: 0 });
+        }
+        if !fallbacks.is_empty() {
             let (child, ffmpeg, out) = (child.clone(), ffmpeg.to_path_buf(), out.to_path_buf());
             std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(1500));
-                let mut slot = child.lock().unwrap_or_else(|e| e.into_inner());
-                let Some(c) = slot.as_mut() else { return };
-                if let Ok(Some(status)) = c.try_wait() {
-                    tracing::warn!("screen capture stopped at once ({status}); recording the main screen with libx264 instead");
-                    match spawn_capture(&ffmpeg, &VideoTarget::Monitor { index: 0 }, &out, fps, max_height, H264::X264) {
+                for next in fallbacks {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    let mut slot = child.lock().unwrap_or_else(|e| e.into_inner());
+                    let Some(c) = slot.as_mut() else { return }; // stopped
+                    let Ok(Some(status)) = c.try_wait() else { return }; // running fine
+                    tracing::warn!("screen capture stopped at once ({status}); retrying with libx264 on {next:?}");
+                    match spawn_capture(&ffmpeg, &next, &out, fps, max_height, H264::X264) {
                         Ok(n) => *slot = Some(n),
                         Err(e) => tracing::warn!("screen capture fallback failed: {e}"),
                     }
@@ -451,11 +468,14 @@ mod tests {
         let a = ffmpeg_capture_args(&VideoTarget::Window { title: "Zoom Meeting".into(), hwnd: 0 }, None, Path::new("o.mp4"), 10, 720, H264::X264).join(" ");
         let b = ffmpeg_capture_args(&VideoTarget::Window { title: "x".into(), hwnd: 4242 }, None, Path::new("o.mp4"), 10, 720, H264::X264).join(" ");
         if cfg!(windows) {
-            assert!(a.contains("gfxcapture=window_title='^Zoom Meeting$'") && a.contains("hwdownload,format=bgra"), "{a}");
+            assert!(a.contains("gfxcapture=window_title=^Zoom Meeting$") && a.contains("hwdownload,format=bgra"), "{a}");
             assert!(b.contains("gfxcapture=hwnd=4242:") && !b.contains("gdigrab"), "{b}");
         }
         assert_eq!(title_regex("(3) Chat | Teams"), r"^\(3\) Chat \| Teams$");
-        assert_eq!(filter_quote("it's"), r"'it\'s'");
+        // Checked against ffmpeg 9 by round-tripping through `metadata=mode=add:value=...`.
+        assert_eq!(filter_escape("^Standup: Weekly$"), r"^Standup\\: Weekly$");
+        assert_eq!(filter_escape("Dan's"), r"Dan\\\'s");
+        assert_eq!(filter_escape("a,b"), r"a\,b");
     }
 
     #[test]

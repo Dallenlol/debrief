@@ -15,7 +15,7 @@ const faq: [string, string][] = [
   ["What hardware do I need?", "Any 64-bit Windows 10/11 or macOS 13+ computer with 8 GB RAM. An NVIDIA GPU with 6 GB+ VRAM, or Apple Silicon, unlocks the larger models and makes everything several times faster."],
   ["How much disk space?", "Models: 1 to 7 GB depending on tier. Recordings: about 35 MB per hour of audio, plus roughly 300 to 600 MB per hour if you record screen video."],
   ["Can I use my own AI model?", "Yes. Point Debrief at Ollama, LM Studio or any OpenAI-compatible server in Settings. Transcription still happens in Debrief."],
-  ["How do I move to a new computer?", "Export everything as a .hark bundle and import it on the other machine, or move the whole data folder."],
+  ["How do I move to a new computer?", "Export everything as a .debrief bundle and import it on the other machine, or move the whole data folder."],
   ["Why is the installer unsigned?", "Code-signing certificates cost money the project doesn't have yet. Check the SHA-256 on the release page, or build from source."],
 ];
 const faqLd = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })) };

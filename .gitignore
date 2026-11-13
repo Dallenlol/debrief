@@ -20,3 +20,5 @@ target-cuda/
 
 # Local AI-tooling state
 .claude-flow/
+*.tsbuildinfo
+.claude/

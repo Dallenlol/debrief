@@ -3,31 +3,22 @@ import Base from "../layouts/Base.astro";
 import { SITE } from "../site";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const rows: [string, string, string, string, string][] = [
-  ["Price", "Free, MIT open source", "Free tier; paid plans for teams and integrations", "Free tier with minute limits; paid plans", "Free tier with limits; paid plans"],
-  ["Where recordings live", "Your computer only", "Their cloud", "Their cloud", "Their cloud"],
-  ["How it captures", "Records mic + the meeting app's audio on your PC (per-app on Windows)", "Bot joins the call", "Bot joins the call", "Bot joins the call"],
-  ["Visible to other participants", "No", "Yes (bot in participant list)", "Yes", "Yes"],
+  ["Price", "Free, MIT open source", "Free tier and paid plans", "Free tier and paid plans", "Free tier and paid plans"],
+  ["Where recordings and transcripts are stored", "Your computer", "The provider's cloud", "The provider's cloud", "The provider's cloud"],
   ["Works offline", "Yes", "No", "No", "No"],
   ["Account required", "No", "Yes", "Yes", "Yes"],
-  ["Transcription", "whisper.cpp on-device (large-v3-turbo on GPU)", "Cloud", "Cloud", "Cloud"],
-  ["Speaker identification", "On-device, with confirmable voice memory", "Yes", "Yes", "Yes"],
-  ["AI summaries", "On-device (Qwen3) from editable templates", "Cloud, templates on paid plans", "Cloud", "Cloud"],
-  ["Ask questions about meetings", "On-device, across your library, timestamp citations", "Cloud", "Cloud", "Cloud"],
-  ["Live captions and notes during the call", "Yes, on-device", "Yes", "Yes", "Yes"],
-  ["Import existing recordings", "Yes (audio and video files)", "Yes", "Yes", "Yes"],
-  ["Follow-up email and exports", "On-device draft; .txt / .srt / .md", "Paid plans", "Paid plans", "Yes"],
-  ["Screen / video recording", "Optional", "Yes", "No", "No"],
-  ["Sharing", "Links on your network, exportable bundles and web pages", "Cloud links", "Cloud links", "Cloud links"],
-  ["Bring your own model", "Yes (Ollama, LM Studio, any OpenAI-compatible server)", "No", "No", "No"],
-  ["Platforms", "Windows, macOS", "Windows, macOS, web", "Web, iOS, Android", "Web, mobile"],
+  ["Where transcription runs", "On your computer (whisper.cpp)", "Cloud", "Cloud", "Cloud"],
+  ["Where AI summaries and chat run", "On your computer, or a cloud AI you choose with your own key", "Cloud", "Cloud", "Cloud"],
+  ["Source code", "Open (MIT)", "Closed", "Closed", "Closed"],
+  ["Bring your own model", "Yes (Ollama, LM Studio, any OpenAI-compatible server, or your own Claude/OpenAI/OpenRouter key)", "No", "No", "No"],
 ];
 ---
 
-<Base title="Debrief vs Fathom, Otter and Fireflies" description="How Debrief, the open-source offline meeting recorder, compares with Fathom, Otter.ai and Fireflies.ai on privacy, price, bots, transcription, speaker identification and AI summaries.">
+<Base title="Debrief vs Fathom, Otter and Fireflies" description="How Debrief, the open-source offline meeting recorder, compares with Fathom, Otter.ai and Fireflies.ai on privacy, price, offline use, transcription and AI summaries.">
   <section style="padding: 56px 0 24px;">
     <p class="eyebrow">Comparison</p>
     <h1>Debrief vs Fathom, Otter and Fireflies</h1>
-    <p class="muted" style="max-width: 680px; font-size: 18px;">The cloud recorders are good products. They also hold every word of every meeting you've ever had. Debrief exists for people who want the same features without that trade.</p>
+    <p class="muted" style="max-width: 680px; font-size: 18px;">The cloud recorders are good products. They work by storing your recordings and transcripts on their servers. Debrief is for people who want those features with everything kept on their own computer.</p>
   </section>
 
   <table>

@@ -33,8 +33,9 @@ pub struct ActiveRecording {
     /// Feeds live ASR; shared with the forwarder so `stop` can close it from here
     /// (the only sender) instead of waiting for the capture channel to drain.
     pcm_tx: Arc<Mutex<Option<crossbeam_channel::Sender<Vec<f32>>>>>,
-    /// Loads the live model and starts the transcriber; yields it (or `None`) when joined.
-    live: Option<std::thread::JoinHandle<Option<LiveTranscriber>>>,
+    /// Loads the live model and starts the transcriber; yields it and its caption forwarder
+    /// (or `None` without a model) when joined.
+    live: Option<std::thread::JoinHandle<Option<(LiveTranscriber, std::thread::JoinHandle<()>)>>>,
     forwarder: Option<JoinHandle<()>>,
     forwarder_stop: Arc<AtomicBool>,
     pub highlights: Vec<u64>,
@@ -134,8 +135,8 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
     let (live_id, _, _) = settings.model_ids(&state.catalog, tier);
     let (pcm_tx, pcm_rx) = crossbeam_channel::unbounded::<Vec<f32>>();
     let live = {
-        let (app, lang) = (app.clone(), settings.language.clone());
-        std::thread::spawn(move || -> Option<LiveTranscriber> {
+        let (app, lang, meeting_id) = (app.clone(), settings.language.clone(), meeting.id.clone());
+        std::thread::spawn(move || -> Option<(LiveTranscriber, std::thread::JoinHandle<()>)> {
             let state = app.state::<AppState>();
             let started = std::time::Instant::now();
             let Some(engine) = state.whisper_live(&live_id) else {
@@ -145,13 +146,16 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
             log::info!("recorder: live model {} ready in {:.1}s", engine.model_id(), started.elapsed().as_secs_f32());
             let (cap_tx2, cap_rx2) = crossbeam_channel::unbounded::<Caption>();
             let live = LiveTranscriber::start(engine, pcm_rx, cap_tx2, lang);
-            std::thread::spawn(move || {
+            // Ends once the transcriber has flushed (its sender drops); `stop` joins it so the
+            // last sentence is in the feed before the provisional transcript is saved.
+            let captions = std::thread::spawn(move || {
                 for c in cap_rx2.iter() {
-                    crate::live_feed::LiveFeed::push(&app.state::<AppState>(), &c);
-                    let _ = app.emit(events::CAPTION, &c);
+                    if crate::live_feed::LiveFeed::push(&app.state::<AppState>(), &meeting_id, &c) {
+                        let _ = app.emit(events::CAPTION, &c);
+                    }
                 }
             });
-            Some(live)
+            Some((live, captions))
         })
     };
     let pcm_tx = Some(pcm_tx);
@@ -434,8 +438,17 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
         let _ = f.join();
     }
     drop(active.pcm_tx.lock().take());
-    if let Some(Ok(Some(l))) = active.live.take().map(|h| h.join()) {
-        l.join();
+    match active.live.take() {
+        // Still loading the model: don't hold Stop (or the tray's Quit) for it. The loader
+        // finishes in the background; its captions no longer match the feed and are dropped.
+        Some(h) if !h.is_finished() => log::info!("recorder: stopped before the live model loaded"),
+        Some(h) => {
+            if let Ok(Some((live, captions))) = h.join() {
+                live.join();
+                let _ = captions.join();
+            }
+        }
+        None => {}
     }
 
     let mut meeting = active.meeting.clone();
@@ -452,6 +465,7 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
         .live_feed
         .lock()
         .as_ref()
+        .filter(|f| f.meeting_id == meeting.id)
         .map(|f| f.finals.iter().map(|c| hark_store::NewSegment { start_ms: c.start_ms, end_ms: c.end_ms, speaker: None, text: c.text.clone() }).collect())
         .unwrap_or_default();
     if !finals.is_empty() {
@@ -459,7 +473,7 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
             log::warn!("provisional transcript: {e}");
         }
     }
-    crate::live_feed::LiveFeed::end(&state);
+    crate::live_feed::LiveFeed::end(&state, &meeting.id);
     emit_state(app);
 
     let app2 = app.clone();

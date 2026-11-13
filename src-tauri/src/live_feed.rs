@@ -51,8 +51,13 @@ impl LiveFeed {
         *state.live_feed.lock() = Some(LiveFeed { meeting_id: meeting_id.to_string(), started: Some(Instant::now()), ..Default::default() });
     }
 
-    pub fn end(state: &AppState) {
-        *state.live_feed.lock() = None;
+    /// Clear the feed, if it is still `meeting_id`'s: a new recording may have begun while the
+    /// previous one was stopping, and its feed must survive.
+    pub fn end(state: &AppState, meeting_id: &str) {
+        let mut g = state.live_feed.lock();
+        if g.as_ref().is_some_and(|f| f.meeting_id == meeting_id) {
+            *g = None;
+        }
     }
 
     pub fn snapshot(state: &AppState) -> Option<LiveSnapshot> {
@@ -65,16 +70,18 @@ impl LiveFeed {
         })
     }
 
-    /// Record a caption from the live transcriber (called for every emitted caption).
-    pub fn push(state: &AppState, c: &Caption) {
+    /// Record a caption from `meeting_id`'s live transcriber. False (and ignored) when the feed
+    /// belongs to another recording, e.g. a late caption from one that was already stopped.
+    pub fn push(state: &AppState, meeting_id: &str, c: &Caption) -> bool {
         let mut g = state.live_feed.lock();
-        let Some(f) = g.as_mut() else { return };
+        let Some(f) = g.as_mut().filter(|f| f.meeting_id == meeting_id) else { return false };
         if c.is_final {
             f.partial = None;
             f.finals.push(c.clone());
         } else {
             f.partial = Some(c.clone());
         }
+        true
     }
 }
 
@@ -114,7 +121,7 @@ pub fn spawn_notes_loop(app: AppHandle, meeting_id: String, stop: Arc<AtomicBool
                 }
                 continue;
             };
-            let previous = state.live_feed.lock().as_ref().map(|f| f.notes.clone()).unwrap_or_default();
+            let previous = state.live_feed.lock().as_ref().filter(|f| f.meeting_id == meeting_id).map(|f| f.notes.clone()).unwrap_or_default();
             let _busy = state.busy_guard();
             let t0 = Instant::now();
             match hark_llm::live_notes::update(backend.as_ref(), &previous, &new_text) {

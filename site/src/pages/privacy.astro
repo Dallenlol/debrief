@@ -2,15 +2,18 @@
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="Privacy" description="Debrief's privacy model: no cloud, no account, no telemetry, no bot. Everything, including AI transcription and summaries, runs on your own computer.">
+<Base title="Privacy" description="Debrief's privacy model: local by default, no account, no telemetry, no bot. Transcription always runs on your computer; AI summaries do too unless you add your own cloud AI key.">
   <section style="padding: 56px 0 24px; max-width: 720px;">
     <p class="eyebrow">Privacy</p>
     <h1>Built so you never have to trust us.</h1>
-    <p class="muted" style="font-size: 18px;">Debrief has no servers, so there is nothing to leak, subpoena, train on, or breach.</p>
+    <p class="muted" style="font-size: 18px;">Debrief has no servers of its own, so there is nothing of yours on our side to leak, subpoena, train on, or breach.</p>
     <h2 style="margin-top: 40px;">What leaves your computer</h2>
     <ul class="muted" style="line-height: 1.8;">
       <li><b>Model downloads</b> from Hugging Face and GitHub, when you ask for them, verified by SHA-256.</li>
-      <li><b>Nothing else</b>, unless you configure your own model endpoint (Ollama, LM Studio). Then transcript text goes to that server, which is yours.</li>
+      <li><b>An update check</b> against this project's GitHub releases (Settings > Updates; off means no request).</li>
+      <li><b>Calendar links</b> you paste (.ics), fetched on your schedule, and a <b>webhook</b> you set up (off by default).</li>
+      <li><b>Cloud AI, only if you turn it on</b> (off by default): transcript text, participant names, summaries and your questions go to the provider you pick (Anthropic Claude, OpenAI or OpenRouter) under your own key and their terms. Audio never leaves; transcription stays on-device.</li>
+      <li><b>Your own model server</b> (Ollama, LM Studio), if you configure one. Then transcript text goes to that server, which is yours.</li>
     </ul>
     <h2 style="margin-top: 40px;">What Debrief never does</h2>
     <ul class="muted" style="line-height: 1.8;">

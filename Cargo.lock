@@ -2135,6 +2135,7 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
+ "uuid",
  "zip 2.4.2",
 ]
 

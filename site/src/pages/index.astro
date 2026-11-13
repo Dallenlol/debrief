@@ -4,7 +4,7 @@ import { SITE } from "../site";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const faq = [
   ["Is Debrief really free?", "Yes. Debrief is open source under the MIT license. There are no plans, seats, or limits."],
-  ["Does it upload my meetings anywhere?", "No. Recording, transcription, speaker identification, summaries and chat all run on your computer. The only downloads are the AI models themselves."],
+  ["Does it upload my meetings anywhere?", "Not unless you choose to. By default recording, transcription, speaker identification, summaries and chat all run on your computer. If you turn on Cloud AI with your own Claude, OpenAI or OpenRouter key, transcript text goes to that provider for summaries and chat; audio never leaves your computer. The other connections are model downloads, the update check, calendar links you add and a webhook you set up."],
   ["Does a bot join my calls?", "No. Debrief records what your computer already hears and shows, so there is nothing for other participants to see in the meeting."],
   ["Which meeting apps work?", "Zoom, Microsoft Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime and GoToMeeting are detected by name. Anything else is caught by audio activity, and you can always start recording manually."],
   ["What hardware do I need?", "Any 64-bit Windows 10/11 or macOS 13+ machine with 8 GB of RAM. A GPU (NVIDIA, or Apple Silicon) makes transcription and summaries much faster."],
@@ -44,7 +44,7 @@ const faqLd = {
       <div class="card"><h3>Fixes bad audio</h3><p class="muted">A local language model repairs garbled words, broken English and filler from bad mics and worse Wi-Fi. The raw transcript is always one click away.</p></div>
       <div class="card"><h3>Summaries from your templates</h3><p class="muted">Sales call, discovery, 1:1, standup, interview, or write your own. Regenerate any meeting with any template.</p></div>
       <div class="card"><h3>Ask Debrief</h3><p class="muted">"What did we decide about pricing?" across one meeting or your whole library, answered with timestamps you can click to hear the moment.</p></div>
-      <div class="card"><h3>Yours to move</h3><p class="muted">Folders, tags, search, clips, .txt/.srt/.md export, a drafted follow-up email, share links on your network, and <code>.hark</code> bundles you can import on another computer. Import old recordings too.</p></div>
+      <div class="card"><h3>Yours to move</h3><p class="muted">Folders, tags, search, clips, .txt/.srt/.md export, a drafted follow-up email, share links on your network, and <code>.debrief</code> bundles you can import on another computer. Import old recordings too.</p></div>
     </div>
   </section>
 
@@ -60,21 +60,19 @@ const faqLd = {
 
   <section style="margin-bottom: 72px;">
     <p class="eyebrow">Compare</p>
-    <h2>Debrief vs the meeting bots</h2>
+    <h2>Debrief vs cloud meeting recorders</h2>
     <table>
       <thead><tr><th></th><th>Debrief</th><th>Fathom</th><th>Otter</th><th>Fireflies</th></tr></thead>
       <tbody>
         <tr><td>Price</td><td class="yes">Free, open source</td><td>Free tier + paid</td><td>Free tier + paid</td><td>Free tier + paid</td></tr>
         <tr><td>Recordings stay on your device</td><td class="yes">Yes</td><td class="no">Cloud</td><td class="no">Cloud</td><td class="no">Cloud</td></tr>
-        <tr><td>Bot joins the meeting</td><td class="yes">Never</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
         <tr><td>Works offline</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
         <tr><td>Speaker identification and memory</td><td class="yes">Yes, on-device</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
         <tr><td>AI summaries and chat</td><td class="yes">Yes, on-device</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-        <tr><td>Screen recording</td><td class="yes">Optional</td><td>Yes</td><td class="no">No</td><td class="no">No</td></tr>
         <tr><td>Account required</td><td class="yes">No</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
       </tbody>
     </table>
-    <p class="muted" style="font-size: 13px; margin-top: 10px;">Competitor details as of September 2026; see their sites for current plans. <a href={`${base}/compare/`}>Full comparison</a>.</p>
+    <p class="muted" style="font-size: 13px; margin-top: 10px;">Competitor details from their public websites as of September 2026; check their sites for current plans. Fathom, Otter.ai and Fireflies.ai are trademarks of their owners; Debrief is not affiliated with them. <a href={`${base}/compare/`}>Full comparison</a>.</p>
   </section>
 
   <section style="margin-bottom: 40px;">

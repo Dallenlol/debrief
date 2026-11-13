@@ -96,8 +96,39 @@ impl Store {
 
     /// `<root>/recordings/<meeting_id>`, created if missing.
     pub fn recordings_dir(&self, meeting_id: &str) -> PathBuf {
-        let d = self.root.join("recordings").join(meeting_id);
+        let d = self.recordings_path(meeting_id);
         let _ = std::fs::create_dir_all(&d);
         d
+    }
+
+    /// Where a meeting's media lives, without creating it. The id becomes one path component
+    /// with anything but ASCII letters, digits and `-` replaced, so an id from an imported
+    /// bundle (`..\..\Startup`, `C:\x`) can never point outside the recordings folder.
+    pub fn recordings_path(&self, meeting_id: &str) -> PathBuf {
+        self.root.join("recordings").join(safe_component(meeting_id))
+    }
+}
+
+/// `id` as a single, harmless file-name component.
+pub fn safe_component(id: &str) -> String {
+    let s: String = id.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).collect();
+    if s.is_empty() {
+        "_".into()
+    } else {
+        s
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::safe_component;
+
+    #[test]
+    fn meeting_ids_cannot_escape_the_recordings_folder() {
+        assert_eq!(safe_component("2f1c5a7e-0d24-4c25-adfa-75f312e330ea"), "2f1c5a7e-0d24-4c25-adfa-75f312e330ea");
+        assert_eq!(safe_component(r"..\..\Startup"), "______Startup");
+        assert_eq!(safe_component("../../etc"), "______etc");
+        assert_eq!(safe_component(r"C:\Windows"), "C__Windows");
+        assert_eq!(safe_component(""), "_");
     }
 }

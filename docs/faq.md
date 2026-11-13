@@ -20,7 +20,7 @@
 
 **How do I get a follow-up email or a subtitle file?** On the meeting page: Summary > Follow-up email drafts a short recap with decisions and owned action items (editable, Copy). Export copies or saves the transcript as .txt, .srt or .md.
 
-**How do I move my library to a new computer?** Settings > Data > Export everything, copy the `.hark` file, then Import on the other machine. Or move the whole data folder.
+**How do I move my library to a new computer?** Settings > Data > Export everything, copy the `.debrief` file, then Import on the other machine. Or move the whole data folder.
 
 **Does it work with Zoom's or Teams' own recording?** Independently. Debrief records what your computer plays and your mic; it doesn't care what the meeting app does.
 

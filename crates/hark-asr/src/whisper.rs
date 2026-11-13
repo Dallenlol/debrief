@@ -24,6 +24,9 @@ pub enum AsrError {
 
 pub struct WhisperEngine {
     ctx: WhisperContext,
+    /// One decoder state kept between calls: allocating it (KV cache and compute buffers,
+    /// on the GPU when there is one) on every live-caption pass costs more than the pass.
+    spare: std::sync::Mutex<Option<whisper_rs::WhisperState>>,
     threads: i32,
     pub gpu: bool,
     /// Catalog id of the loaded model ("" when loaded from an arbitrary path).
@@ -44,14 +47,16 @@ impl WhisperEngine {
             p.use_gpu(gpu);
             WhisperContext::new_with_params(model, p)
         };
-        if use_gpu {
+        // Without a GPU backend compiled in, whisper accepts use_gpu and quietly runs on the
+        // CPU; reporting that as GPU would skip the CPU-only speedups (short audio_ctx).
+        if use_gpu && cfg!(any(feature = "cuda", feature = "metal")) {
             if let Ok(ctx) = try_load(true) {
-                return Ok(WhisperEngine { ctx, threads, gpu: true, model_id: String::new() });
+                return Ok(WhisperEngine { ctx, spare: Default::default(), threads, gpu: true, model_id: String::new() });
             }
             tracing::warn!("whisper GPU init failed; falling back to CPU");
         }
         let ctx = try_load(false).map_err(|e| AsrError::Whisper(e.to_string()))?;
-        Ok(WhisperEngine { ctx, threads, gpu: false, model_id: String::new() })
+        Ok(WhisperEngine { ctx, spare: Default::default(), threads, gpu: false, model_id: String::new() })
     }
 
     /// Tag the engine with the catalog id it was loaded from.
@@ -89,7 +94,11 @@ impl WhisperEngine {
         if pcm16k.len() < 1600 {
             return Ok(Transcribed::default());
         }
-        let mut state = self.ctx.create_state().map_err(|e| AsrError::Whisper(e.to_string()))?;
+        let spare = self.spare.lock().unwrap_or_else(|e| e.into_inner()).take();
+        let mut state = match spare {
+            Some(st) => st,
+            None => self.ctx.create_state().map_err(|e| AsrError::Whisper(e.to_string()))?,
+        };
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_n_threads(self.threads);
         params.set_language(o.lang);
@@ -117,7 +126,8 @@ impl WhisperEngine {
         let mut out = Vec::new();
         for seg in state.as_iter() {
             let text = seg.to_str_lossy().map(|c| c.trim().to_string()).unwrap_or_default();
-            if text.is_empty() || is_noise_marker(&text) {
+            // Punctuation alone (".", "...") is whisper filling silence, not speech.
+            if !text.chars().any(char::is_alphanumeric) || is_noise_marker(&text) {
                 continue;
             }
             if let Some(max) = o.drop_no_speech_above {
@@ -133,6 +143,7 @@ impl WhisperEngine {
                 is_final: o.is_final,
             });
         }
+        *self.spare.lock().unwrap_or_else(|e| e.into_inner()) = Some(state);
         Ok(Transcribed { captions: out, lang })
     }
 }

@@ -47,9 +47,10 @@ jobs:
           targets: ${{ matrix.target || '' }}
       - uses: Swatinem/rust-cache@v2
         with:
-          # ggml-v2: whisper-rs-sys does not re-run its build script when the GGML_* env
+          # whisper-rs-sys does not re-run its build script when the GGML_* / CMAKE_* env
           # (in .cargo/config.toml) changes, so bump this suffix whenever those flags move.
-          key: ${{ matrix.name }}-ggml-v2
+          # v3: CMAKE_PROJECT_INCLUDE puts /O2 back into MSVC Release builds of whisper.cpp.
+          key: ${{ matrix.name }}-ggml-v3
           # sherpa-rs downloads prebuilt binaries here; cache them with the build-script output that references them.
           cache-directories: |
             ~/.cache/sherpa-rs

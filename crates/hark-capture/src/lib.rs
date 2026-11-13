@@ -19,5 +19,5 @@ pub mod wav;
 pub use devices::{find_device, input_devices, output_devices, AudioDevice};
 pub use recorder::{CaptureEvent, RecordConfig, RecordError, RecordOutput, Recorder, ARCHIVE_HZ, ASR_HZ};
 pub use monitors::{list_monitors, MonitorInfo};
-pub use video::{hidden_command, VideoRecorder, VideoTarget};
+pub use video::{background_command, hidden_command, VideoRecorder, VideoTarget};
 pub use wav::WavWriter;

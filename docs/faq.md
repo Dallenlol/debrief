@@ -6,7 +6,7 @@
 
 **How accurate is the transcription?** Whisper large-v3-turbo (GPU tier) is state of the art for English and most major languages. Smaller CPU models are good but make more mistakes; the AI cleanup pass fixes many of them. Live captions during the call use the small model and are provisional; the transcript you keep comes from the full pass after the call.
 
-**How long does processing take after a call?** With the CUDA build, an 88-minute call takes about 10 minutes end to end (transcript, speakers, clean-up, summary, search index). On a CPU-only machine Debrief measures how fast each speech model runs and picks the best one that finishes within the recording's own length; speaker detection runs across all cores in parallel and alongside transcription.
+**How long does processing take after a call?** With the CUDA build, an 88-minute call takes about 10 minutes end to end (transcript, speakers, clean-up, summary, search index). On a CPU-only machine Debrief measures how fast each speech model runs and picks the best one that finishes within the recording's own length; speaker detection runs across all cores in parallel and alongside transcription. All of this runs at below-normal priority, so the rest of your computer stays responsive while it works.
 
 **Can it record only the meeting and not my music or notifications?** On Windows, yes: pick the meeting window and leave Audio on "This app only". Debrief uses Windows' per-application audio capture, so other apps never reach the recording. Your mic is always included.
 

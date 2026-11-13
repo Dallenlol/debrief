@@ -21,7 +21,7 @@ const faqLd = {
     <p class="eyebrow">Open-source meeting recorder for Windows and macOS</p>
     <h1 style="max-width: 820px;">Record every meeting. Keep every word on your own computer.</h1>
     <p class="muted" style="max-width: 640px; font-size: 19px;">
-      Debrief notices when you're on a call and offers to record just that app. You see captions and running notes while it's on; afterwards you get the transcript with speaker names, the summary, a follow-up email, and answers to any question about any meeting, all from an AI that runs on your machine. No bot. No cloud. No account. Free, forever.
+      Debrief notices when you're on a call and offers to record just that app. You see captions and running notes while it's on; afterwards you get the transcript with speaker names, the summary, a follow-up email, and answers to any question about any meeting, all from AI that runs on your machine unless you choose a cloud model with your own key. No bot. No account. Free, forever.
     </p>
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top: 8px;">
       <a class="btn ember" href={`${base}/download/`}>Download Debrief</a>
@@ -50,11 +50,11 @@ const faqLd = {
 
   <section style="margin-bottom: 72px;">
     <p class="eyebrow">How it works</p>
-    <h2>Three things happen, all on your machine.</h2>
+    <h2>Three things happen, on your machine by default.</h2>
     <div class="grid" style="margin-top: 24px;">
       <div><h3>1. Record</h3><p class="muted">Your microphone and the meeting app's audio are captured as separate tracks, plus optional screen video, written to disk continuously and finished automatically if anything crashes.</p></div>
       <div><h3>2. Transcribe</h3><p class="muted">whisper.cpp turns speech into text with live captions during the call and a high-quality pass after. pyannote and TitaNet identify who spoke, across all your cores, in parallel with the transcript.</p></div>
-      <div><h3>3. Understand</h3><p class="muted">llama.cpp runs Qwen3 (1.7B to 8B depending on your hardware) for cleanup, summaries and chat. Or point Debrief at Ollama or LM Studio.</p></div>
+      <div><h3>3. Understand</h3><p class="muted">llama.cpp runs Qwen3 (1.7B to 8B depending on your hardware) for cleanup, summaries and chat. Or point Debrief at Ollama or LM Studio, or use Claude, OpenAI or OpenRouter with your own key.</p></div>
     </div>
   </section>
 

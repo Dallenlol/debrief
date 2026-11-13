@@ -1,6 +1,6 @@
 # Models and hardware
 
-Everything runs on your machine. Debrief chooses model sizes from what it finds:
+By default everything runs on your machine. Debrief chooses model sizes from what it finds:
 
 | Tier | Picked when | Live captions | Final transcript | Summaries and chat |
 |---|---|---|---|---|
@@ -25,6 +25,10 @@ Override any of this in Settings > AI models. Bigger models are better but slowe
 ## Using your own model server
 
 If you already run Ollama, LM Studio, or anything with an OpenAI-compatible API, point Debrief at it: Settings > AI assistant > "On an endpoint I run". Transcription still runs in Debrief; only summaries, cleanup and chat go to your endpoint.
+
+## Cloud AI
+
+Settings > AI assistant > Cloud AI uses Anthropic Claude, OpenAI or OpenRouter with your own API key for summaries, titles, clean-up, follow-ups, Ask and live notes. Transcript text (never audio) goes to that provider; transcription and speaker detection stay on your computer. If a cloud call fails, the local model answers instead. See [Privacy](privacy.md).
 
 ## Where models live
 

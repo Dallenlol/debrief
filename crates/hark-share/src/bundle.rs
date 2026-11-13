@@ -100,7 +100,10 @@ pub fn import_bundle(store: &Store, bundle: &Path) -> Result<ImportReport> {
     for bm in &manifest.meetings {
         let id = &bm.meeting.id;
         // Ids and file names come from the bundle file: accept only what Debrief itself writes.
-        if uuid::Uuid::parse_str(id).is_err() || bm.media.iter().any(|f| !MEDIA_FILES.contains(&f.as_str())) {
+        // Canonical lowercase form only: Windows folder names ignore case, so an uppercase copy
+        // of an existing id would slip past the duplicate check and write into that meeting.
+        let canonical = uuid::Uuid::parse_str(id).map(|u| u.hyphenated().to_string() == *id).unwrap_or(false);
+        if !canonical || bm.media.iter().any(|f| !MEDIA_FILES.contains(&f.as_str())) {
             report.errors.push(format!("{}: not a valid Debrief meeting (unexpected id or file names)", bm.meeting.title));
             continue;
         }
@@ -208,7 +211,8 @@ mod tests {
             data.join("hark.db")
         })
         .unwrap();
-        for (id, media) in [("../../escaped", "mix.wav"), (m.id.as_str(), "../../escaped.bat")] {
+        let upper = m.id.to_uppercase();
+        for (id, media) in [("../../escaped", "mix.wav"), (m.id.as_str(), "../../escaped.bat"), (upper.as_str(), "mix.wav")] {
             manifest.meetings[0].meeting.id = id.to_string();
             manifest.meetings[0].media = vec![media.to_string()];
             let evil = src_dir.path().join("evil.debrief");

@@ -3,8 +3,8 @@ use parking_lot::Mutex;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 
-/// Default location: `%APPDATA%\Hark` on Windows,
-/// `~/Library/Application Support/Hark` on macOS, `~/.local/share/hark` elsewhere.
+/// Default location: `%APPDATA%\Debrief` on Windows, `~/Library/Application Support/Debrief`
+/// on macOS, the platform data dir elsewhere; an old `Hark` folder is moved there on first start.
 pub fn default_data_dir() -> PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
     let (new, old) = if cfg!(target_os = "linux") { ("debrief", "hark") } else { ("Debrief", "Hark") };
@@ -26,7 +26,7 @@ fn migrate_data_dir(old: &Path, new: &Path) -> PathBuf {
 
 const POINTER_FILE: &str = "data-dir.txt";
 
-/// Root of all Hark data. The default location may hold a `data-dir.txt`
+/// Root of all Debrief data. The default location may hold a `data-dir.txt`
 /// pointer to a user-chosen folder (see `write_data_dir_pointer`). Created on first call.
 pub fn data_dir() -> PathBuf {
     let default = default_data_dir();

@@ -36,6 +36,8 @@ pub struct ActiveRecording {
     /// Loads the live model and starts the transcriber; yields it and its caption forwarder
     /// (or `None` without a model) when joined.
     live: Option<std::thread::JoinHandle<Option<(LiveTranscriber, std::thread::JoinHandle<()>)>>>,
+    /// Set by `stop` when it leaves the loader behind, so it never starts transcribing.
+    live_cancel: Arc<AtomicBool>,
     forwarder: Option<JoinHandle<()>>,
     forwarder_stop: Arc<AtomicBool>,
     pub highlights: Vec<u64>,
@@ -134,8 +136,9 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
     let tier = settings.tier(&state.hardware);
     let (live_id, _, _) = settings.model_ids(&state.catalog, tier);
     let (pcm_tx, pcm_rx) = crossbeam_channel::unbounded::<Vec<f32>>();
+    let live_cancel = Arc::new(AtomicBool::new(false));
     let live = {
-        let (app, lang, meeting_id) = (app.clone(), settings.language.clone(), meeting.id.clone());
+        let (app, lang, meeting_id, cancel) = (app.clone(), settings.language.clone(), meeting.id.clone(), live_cancel.clone());
         std::thread::spawn(move || -> Option<(LiveTranscriber, std::thread::JoinHandle<()>)> {
             let state = app.state::<AppState>();
             let started = std::time::Instant::now();
@@ -144,6 +147,9 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
                 return None; // drops pcm_rx, so the forwarder's sends fail fast
             };
             log::info!("recorder: live model {} ready in {:.1}s", engine.model_id(), started.elapsed().as_secs_f32());
+            if cancel.load(Ordering::SeqCst) {
+                return None; // stopped while loading: nothing left to caption
+            }
             let (cap_tx2, cap_rx2) = crossbeam_channel::unbounded::<Caption>();
             let live = LiveTranscriber::start(engine, pcm_rx, cap_tx2, lang);
             // Ends once the transcriber has flushed (its sender drops); `stop` joins it so the
@@ -205,6 +211,7 @@ pub fn start(app: &AppHandle, opts: StartOptions) -> Result<Meeting, String> {
         video,
         pcm_tx,
         live: Some(live),
+        live_cancel,
         forwarder: Some(forwarder),
         forwarder_stop,
         highlights: Vec::new(),
@@ -441,7 +448,10 @@ pub fn stop(app: &AppHandle) -> Result<Meeting, String> {
     match active.live.take() {
         // Still loading the model: don't hold Stop (or the tray's Quit) for it. The loader
         // finishes in the background; its captions no longer match the feed and are dropped.
-        Some(h) if !h.is_finished() => log::info!("recorder: stopped before the live model loaded"),
+        Some(h) if !h.is_finished() => {
+            active.live_cancel.store(true, Ordering::SeqCst);
+            log::info!("recorder: stopped before the live model loaded");
+        }
         Some(h) => {
             if let Ok(Some((live, captions))) = h.join() {
                 live.join();

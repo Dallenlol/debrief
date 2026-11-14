@@ -45,6 +45,16 @@ pub fn hidden_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
 /// Like [`hidden_command`], at below-normal CPU priority: for background work (screen
 /// encoding, speaker detection) that must never slow down the call or whatever the user is doing.
 pub fn background_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    #[cfg(unix)]
+    {
+        // `nice` execs the program, so the child keeps its pid, stdin and exit status.
+        let nice = Path::new("/usr/bin/nice");
+        if nice.exists() {
+            let mut cmd = Command::new(nice);
+            cmd.arg("-n").arg("10").arg(program.as_ref());
+            return cmd;
+        }
+    }
     #[allow(unused_mut)]
     let mut cmd = Command::new(program);
     #[cfg(windows)]
@@ -64,6 +74,8 @@ pub enum H264 {
     Nvenc,
     Amf,
     Qsv,
+    /// Apple's hardware encoder (Apple Silicon and Intel Macs with a T2 or iGPU).
+    VideoToolbox,
     X264,
 }
 
@@ -73,6 +85,7 @@ impl H264 {
             H264::Nvenc => &["-c:v", "h264_nvenc", "-preset", "p2", "-tune", "ll", "-rc", "vbr", "-cq", "30", "-b:v", "0"],
             H264::Amf => &["-c:v", "h264_amf", "-usage", "lowlatency", "-quality", "speed", "-rc", "cqp", "-qp_i", "26", "-qp_p", "30"],
             H264::Qsv => &["-c:v", "h264_qsv", "-preset", "veryfast", "-global_quality", "28"],
+            H264::VideoToolbox => &["-c:v", "h264_videotoolbox", "-realtime", "1", "-b:v", "3000k"],
             // fable: 4 threads keeps a software encode to a few cores; quality ceiling is "superfast".
             H264::X264 => &["-c:v", "libx264", "-preset", "superfast", "-crf", "28", "-threads", "4"],
         };
@@ -85,7 +98,14 @@ static ENCODER: std::sync::OnceLock<H264> = std::sync::OnceLock::new();
 /// The best H.264 encoder that actually works here (probed once per run with a tiny encode).
 pub fn pick_encoder(ffmpeg: &Path) -> H264 {
     *ENCODER.get_or_init(|| {
-        for e in [H264::Nvenc, H264::Amf, H264::Qsv] {
+        let candidates: &[H264] = if cfg!(windows) {
+            &[H264::Nvenc, H264::Amf, H264::Qsv]
+        } else if cfg!(target_os = "macos") {
+            &[H264::VideoToolbox]
+        } else {
+            &[]
+        };
+        for &e in candidates {
             let mut cmd = hidden_command(ffmpeg);
             cmd.args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=s=640x360:r=15:d=0.4", "-pix_fmt", "yuv420p"]);
             cmd.args(e.args()).args(["-f", "null", "-"]);
@@ -232,6 +252,21 @@ pub fn ffmpeg_snapshot_args(target: &VideoTarget, monitor: Option<&MonitorInfo>,
 
 /// Grab one frame of `target` into `out` (PNG).
 pub fn snapshot(ffmpeg: &Path, target: &VideoTarget, out: &Path) -> Result<(), String> {
+    // macOS: the system tool grabs exactly that window (by CGWindowID), at Retina resolution.
+    #[cfg(target_os = "macos")]
+    if let VideoTarget::Window { hwnd, .. } = target {
+        if *hwnd != 0 {
+            let status = Command::new("/usr/sbin/screencapture")
+                .args(["-x", "-o", "-l", &hwnd.to_string()])
+                .arg(out)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map_err(|e| e.to_string())?;
+            return if status.success() && out.exists() { Ok(()) } else { Err(format!("screencapture exited with {status}")) };
+        }
+    }
     let monitor = match target {
         VideoTarget::Monitor { index } => crate::monitors::list_monitors(Some(ffmpeg)).into_iter().find(|m| m.index == *index),
         VideoTarget::Window { .. } => None,
@@ -487,6 +522,12 @@ mod tests {
         } else if cfg!(target_os = "macos") {
             assert!(a.contains("-i 2:none"));
         }
+    }
+
+    #[test]
+    fn videotoolbox_args() {
+        let a = ffmpeg_capture_args(&VideoTarget::Monitor { index: 0 }, None, Path::new("o.mp4"), 15, 1080, H264::VideoToolbox).join(" ");
+        assert!(a.contains("-c:v h264_videotoolbox -realtime 1") && !a.contains("libx264"), "{a}");
     }
 
     #[test]

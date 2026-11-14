@@ -28,7 +28,7 @@
 
 ## Where do attendee names come from?
 
-On Windows, Debrief reads the names shown in the meeting app's own window (Zoom roster, Teams participant list, Meet tiles) through the accessibility tree, the same way a screen reader would. If you added a calendar source, the event's attendees are used too. Names are only suggestions in the speaker rename box; Debrief never assigns them by itself. macOS support for window scraping is planned.
+On Windows, Debrief reads the names shown in the meeting app's own window (Zoom roster, Teams participant list, Meet tiles) through the accessibility tree, the same way a screen reader would. If you added a calendar source, the event's attendees are used too. With screen video on, Debrief also reads the name labels on video tiles (Windows OCR, Apple Vision on a Mac). Names are only suggestions in the speaker rename box; Debrief never assigns them by itself. Reading a Mac meeting app's participant list (accessibility) is planned.
 
 ## How do updates work?
 

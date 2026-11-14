@@ -202,7 +202,7 @@ mod tests {
         let m = Meeting::new_recording("Evil", None);
         src.create_meeting(&m).unwrap();
         std::fs::write(src.recordings_dir(&m.id).join("mix.wav"), b"x").unwrap();
-        let mut manifest = export_bundle(&src, &[m.id.clone()], &src_dir.path().join("ok.debrief"), false).unwrap();
+        let mut manifest = export_bundle(&src, std::slice::from_ref(&m.id), &src_dir.path().join("ok.debrief"), false).unwrap();
 
         let dst_dir = tempfile::tempdir().unwrap();
         let data = dst_dir.path().join("data");

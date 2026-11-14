@@ -29,14 +29,14 @@ Debrief is a desktop app for Windows and macOS. It notices when you're in a call
 
 **Recording**
 - **Call detection** for Zoom, Teams, Google Meet, Webex, Discord, Slack huddles, FaceTime, GoToMeeting, Whereby, Jitsi, Around, Skype, RingCentral and WhatsApp/Telegram/Signal calls, native or in a browser tab, plus an audio-activity fallback for anything else. It only ever shows a small **Record?** popup.
-- **Records only the meeting.** Pick the meeting window or a display. On Windows Debrief captures only that app's audio plus your mic, so music and notifications stay out.
-- **Optional screen recording**, encoded on the graphics card (NVIDIA NVENC, AMD AMF, Intel Quick Sync) on Windows PCs that have one.
+- **Records only the meeting.** Pick the meeting window or a display, and Debrief can capture only that app's audio plus your mic, so music and notifications stay out (Windows, and macOS 14.2+ as an option; for a call in Safari on a Mac use "Everything playing").
+- **Optional screen recording**, encoded on the graphics hardware: NVIDIA NVENC, AMD AMF or Intel Quick Sync on Windows, Apple VideoToolbox on a Mac.
 - **Hard to lose a recording.** Audio is written to disk as it's captured. If a headset disconnects, Debrief switches devices and keeps going; if the app crashes, the recording is finished the next time it starts.
 
 **Transcription**
 - **Live captions** while the call runs, finalised within about two seconds of each sentence, plus running notes (topics, decisions, action items) that update every minute or two.
 - **Accurate transcript after the call** with Whisper (up to large-v3-turbo on a GPU), in 29 languages (or auto-detect).
-- **Speaker diarization** (who spoke when) that remembers voices. Name someone once and Debrief suggests them next time. Names can also come from your calendar and, on Windows, from the meeting window and the name labels on video tiles.
+- **Speaker diarization** (who spoke when) that remembers voices. Name someone once and Debrief suggests them next time. Names can also come from your calendar, from the name labels on video tiles (Windows OCR, Apple Vision on a Mac) and, on Windows, from the meeting window's participant list.
 - **Imports** existing audio and video files: phone voice memos, old Zoom recordings.
 
 **AI meeting notes and search**
@@ -58,8 +58,8 @@ Debrief is a desktop app for Windows and macOS. It notices when you're in a call
 Debrief is a native Rust app built with [Tauri](https://tauri.app), not Electron.
 
 - **Idle** it's a tray icon and a 2-second window check. AI models load only when needed and are unloaded 3 minutes after the last job.
-- **While you record** the screen is encoded on the graphics card's media engine when a Windows PC has one, and live captions reuse one warm Whisper decoder instead of setting it up every few seconds.
-- **After the call** transcription, speaker detection and AI run at below-normal CPU priority on Windows, so games, calls and your browser stay smooth while it works.
+- **While you record** the screen is encoded on the graphics hardware's media engine (Windows and Mac), and live captions reuse one warm Whisper decoder instead of setting it up every few seconds.
+- **After the call** speaker detection and video jobs run at lower CPU priority (and on Windows transcription and AI too), so games, calls and your browser stay smooth while it works. On Apple Silicon the AI runs on the GPU through Metal.
 - **Sized for your hardware.** It picks model sizes for your machine, and on CPU-only computers it measures each speech model's real speed and uses the best one that finishes within the recording's own length.
 
 ## Install

@@ -40,7 +40,7 @@ fn live_captions_keep_up_in_real_time() {
         Ok(p) => read_wav_16k_mono(std::path::Path::new(&p)),
         Err(_) => clip.clone(),
     };
-    audio.extend(std::iter::repeat(0.0).take(2 * HZ));
+    audio.extend(std::iter::repeat_n(0.0, 2 * HZ));
     let (pcm_tx, pcm_rx) = crossbeam_channel::unbounded::<Vec<f32>>();
     let (cap_tx, cap_rx) = crossbeam_channel::unbounded();
     let live = LiveTranscriber::start(engine.clone(), pcm_rx, cap_tx, Some("en".into()));

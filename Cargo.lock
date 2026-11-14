@@ -2040,6 +2040,11 @@ dependencies = [
  "cpal",
  "crossbeam-channel",
  "hound",
+ "libc",
+ "objc2",
+ "objc2-core-audio",
+ "objc2-core-foundation",
+ "objc2-foundation",
  "parking_lot",
  "serde",
  "tempfile",
@@ -2055,6 +2060,9 @@ version = "0.1.0"
 dependencies = [
  "core-foundation 0.10.1",
  "core-graphics",
+ "objc2",
+ "objc2-foundation",
+ "objc2-vision",
  "regex",
  "serde",
  "thiserror 2.0.20",
@@ -3599,6 +3607,16 @@ name = "objc2-user-notifications"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9df9128cbbfef73cda168416ccf7f837b62737d748333bfe9ab71c245d76613e"
+dependencies = [
+ "objc2",
+ "objc2-foundation",
+]
+
+[[package]]
+name = "objc2-vision"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfc194758a2d5d7540b1ad283bfb9ca318ec608991892326e95b428230b2689b"
 dependencies = [
  "objc2",
  "objc2-foundation",

@@ -19,7 +19,7 @@ Permissions Debrief asks for, and why:
 
 - **Microphone**: your side of the call.
 - **Audio recording (system audio)**: the other participants. Requires macOS 14.6 or later; on older versions Debrief records mic only.
-- **Screen recording**: only if you turn on screen video.
+- **Screen recording**: only if you turn on screen video (also used to read names off video tiles).
 
 ## First run
 
@@ -32,7 +32,7 @@ Permissions Debrief asks for, and why:
 Every way to start - the call popup, **Record now**, the hotkey (`Ctrl/Cmd+Shift+R`), the tray - opens the same picker:
 
 - **Screen / Window**: the meeting window is preselected when Debrief detected the call; pick any window or display. Turn "Screen on" off to record audio only.
-- **Audio**: *This app only* (Windows) records just the chosen window's application plus your mic; *Everything playing* records all system audio plus your mic. On macOS all system audio is recorded.
+- **Audio**: *This app only* records just the chosen window's application plus your mic; *Everything playing* records all system audio plus your mic. On macOS *This app only* needs macOS 14.2+ and is off by default: browser calls in Safari play their audio from a system process it cannot see, so use *Everything playing* there. If Debrief finds no audio for the app, it records everything instead and tells you.
 
 While recording, open the meeting from the Library to watch captions and running notes. Stop takes a few seconds (last captions, video trailer), then the full transcript, speakers, summary and Ask Debrief arrive.
 

@@ -254,10 +254,14 @@ fn open_sys(cfg: &RecordConfig, shared: &Arc<Shared>, on_error: &crate::stream::
     if !cfg.capture_system {
         return None;
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     if let Some(pid) = cfg.audio_pid {
         let sys_shared = shared.clone();
-        match InputStream::process_loopback(
+        #[cfg(windows)]
+        let open = InputStream::process_loopback;
+        #[cfg(target_os = "macos")]
+        let open = InputStream::app_tap;
+        match open(
             pid,
             ARCHIVE_HZ,
             Arc::new(move |pcm| {

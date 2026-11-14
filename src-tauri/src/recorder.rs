@@ -356,11 +356,12 @@ fn merge_participants(app: &AppHandle, meeting_id: &str, names: Vec<String>) {
     let _ = app.emit(events::PARTICIPANTS, events::ParticipantsPayload { meeting_id: meeting_id.to_string(), participants: merged });
 }
 
-/// Read names off the screen being recorded (video-tile labels) with Windows OCR. A name
+/// Read names off the screen being recorded (video-tile labels) with the OS text recognition
+/// (Windows OCR, Apple Vision). A name
 /// counts once it shows up in two different frames, so passing text on a shared screen
 /// rarely gets in.
 fn spawn_screen_name_reader(app: AppHandle, meeting_id: String, ffmpeg: std::path::PathBuf, target: VideoTarget, dir: std::path::PathBuf) {
-    if !cfg!(windows) {
+    if !cfg!(any(windows, target_os = "macos")) {
         return;
     }
     std::thread::spawn(move || {

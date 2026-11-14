@@ -10,14 +10,17 @@ export function Popup() {
   const [left, setLeft] = useState(30);
   const [sources, setSources] = useState<VideoSource[]>([]);
   const [target, setTarget] = useState<VideoTarget | null>(null);
-  // Audio: only the chosen window's app (Windows), or everything the computer plays.
-  const [appAudio, setAppAudio] = useState(true);
   const manual = det?.app === "manual";
   const isWindows = navigator.userAgent.includes("Windows");
+  const isMac = navigator.userAgent.includes("Mac");
+  // Audio: only the chosen window's app, or everything the computer plays. On a Mac the
+  // per-app tap misses browser calls in Safari (its audio plays from a system process), so
+  // it is opt-in there; Debrief falls back to everything when it finds no audio for the app.
+  const [appAudio, setAppAudio] = useState(isWindows);
 
   const keyOf = (t: VideoTarget) => (t.kind === "monitor" ? `m:${t.index}` : `w:${t.title}`);
   const selected = sources.find((s) => target && keyOf(s.target) === keyOf(target)) ?? null;
-  const canAppAudio = isWindows && selected?.pid != null;
+  const canAppAudio = (isWindows || isMac) && selected?.pid != null;
 
   useEffect(() => {
     void cmd.getSettings().then((s) => setVideo(s.video_enabled));
@@ -106,7 +109,7 @@ export function Popup() {
       )}
       <div className="mt-1.5 flex items-center gap-3 text-[11px] text-ink-3" role="radiogroup" aria-label="Which audio to capture">
         <span className="shrink-0">Audio</span>
-        <label className={`inline-flex items-center gap-1 ${canAppAudio ? "" : "opacity-50"}`} title={canAppAudio ? "Only what this app plays - no music or notifications from other apps" : isWindows ? "Pick a window to capture just that app" : "Per-app audio needs Windows; all system audio is recorded"}>
+        <label className={`inline-flex items-center gap-1 ${canAppAudio ? "" : "opacity-50"}`} title={canAppAudio ? (isMac ? "Only what this app plays (macOS 14.2+). For a call in Safari use Everything playing." : "Only what this app plays - no music or notifications from other apps") : isWindows || isMac ? "Pick a window to capture just that app" : "Per-app audio needs Windows or macOS; all system audio is recorded"}>
           <input type="radio" name="audio" checked={canAppAudio && appAudio} disabled={!canAppAudio} onChange={() => setAppAudio(true)} /> This app only
         </label>
         <label className="inline-flex items-center gap-1">

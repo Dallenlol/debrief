@@ -103,7 +103,11 @@ mod imp {
                 continue;
             }
             let owner = get_str(&dict, "kCGWindowOwnerName").unwrap_or_default().to_lowercase();
-            out.push(WindowInfo { process: owner, title, hwnd: 0, pid: 0 });
+            // The window number (CGWindowID) stands in for an HWND: it lets a snapshot target this
+            // window; the owner pid drives per-app audio.
+            let hwnd = get_i64(&dict, "kCGWindowNumber").unwrap_or(0) as isize;
+            let pid = get_i64(&dict, "kCGWindowOwnerPID").unwrap_or(0).max(0) as u32;
+            out.push(WindowInfo { process: owner, title, hwnd, pid });
         }
         out
     }

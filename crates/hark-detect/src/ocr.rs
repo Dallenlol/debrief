@@ -1,11 +1,12 @@
-//! People's names read off a screenshot of the call (Windows' built-in OCR), for the
+//! People's names read off a screenshot of the call (Windows' built-in OCR, or Apple's
+//! Vision text recognition on macOS), for the
 //! name labels on video tiles that a meeting app does not expose to accessibility.
 //! Names are only ever *suggested*, and only kept once seen in more than one frame.
 
 use crate::participants::extract_names;
 use std::path::Path;
 
-/// Names in the image at `path`. Empty when OCR is unavailable (non-Windows, no OCR language).
+/// Names in the image at `path`. Empty when OCR is unavailable (Linux, no OCR language).
 pub fn names_in_image(path: &Path) -> Vec<String> {
     names_from_lines(&ocr_lines(path))
 }
@@ -26,9 +27,45 @@ fn ocr_lines(path: &Path) -> Vec<String> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+fn ocr_lines(path: &Path) -> Vec<String> {
+    mac::lines(path)
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn ocr_lines(_path: &Path) -> Vec<String> {
     Vec::new()
+}
+
+/// Apple Vision: one recognised line per text observation, best candidate only.
+#[cfg(target_os = "macos")]
+mod mac {
+    use objc2::AnyThread;
+    use objc2_foundation::{NSArray, NSDictionary, NSString, NSURL};
+    use objc2_vision::{VNImageRequestHandler, VNRecognizeTextRequest, VNRequest, VNRequestTextRecognitionLevel};
+    use std::path::Path;
+
+    pub fn lines(path: &Path) -> Vec<String> {
+        let Some(p) = path.to_str() else { return Vec::new() };
+        #[allow(unused_unsafe)]
+        // SAFETY: Vision objects built from a file URL and used on this thread only.
+        unsafe {
+            let url = NSURL::fileURLWithPath(&NSString::from_str(p));
+            let handler = VNImageRequestHandler::initWithURL_options(VNImageRequestHandler::alloc(), &url, &NSDictionary::new());
+            let request = VNRecognizeTextRequest::new();
+            request.setRecognitionLevel(VNRequestTextRecognitionLevel::Accurate);
+            request.setUsesLanguageCorrection(false); // names are not dictionary words
+            let as_request: &VNRequest = &request;
+            if let Err(e) = handler.performRequests_error(&NSArray::from_slice(&[as_request])) {
+                tracing::warn!("ocr {}: {}", path.display(), e.localizedDescription());
+                return Vec::new();
+            }
+            request
+                .results()
+                .map(|obs| obs.iter().filter_map(|o| o.topCandidates(1).firstObject().map(|t| t.string().to_string())).collect())
+                .unwrap_or_default()
+        }
+    }
 }
 
 #[cfg(windows)]

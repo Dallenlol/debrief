@@ -51,7 +51,7 @@ pub fn list_video_sources(state: State<AppState>, meeting_app: Option<String>) -
     let mut seen: Vec<String> = Vec::new();
     let mut wins: Vec<VideoSource> = windows
         .into_iter()
-        .filter(|w| !w.title.trim().is_empty() && w.process != "debrief.exe" && w.process != "hark.exe" && w.process != "hark")
+        .filter(|w| !w.title.trim().is_empty() && w.process != "debrief.exe" && w.process != "debrief" && w.process != "hark.exe" && w.process != "hark")
         .filter(|w| {
             if seen.iter().any(|t| t == &w.title) {
                 false

@@ -10,6 +10,8 @@ pub mod dsp;
 pub mod probe;
 #[cfg(windows)]
 pub mod process_loopback;
+#[cfg(target_os = "macos")]
+mod mac_app_tap;
 pub mod recorder;
 pub mod stream;
 pub mod monitors;

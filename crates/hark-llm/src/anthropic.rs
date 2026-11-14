@@ -134,10 +134,8 @@ impl LlmBackend for AnthropicApi {
                         }
                     }
                 }
-                "message_delta" => {
-                    if ev.delta.and_then(|d| d.stop_reason).as_deref() == Some("refusal") && out.trim().is_empty() {
-                        return Err(LlmError::Engine("Claude declined to answer this request.".into()));
-                    }
+                "message_delta" if ev.delta.and_then(|d| d.stop_reason).as_deref() == Some("refusal") && out.trim().is_empty() => {
+                    return Err(LlmError::Engine("Claude declined to answer this request.".into()));
                 }
                 "error" => return Err(LlmError::Http(ev.error.map(|e| e.message).unwrap_or_else(|| "stream error".into()))),
                 "message_stop" => break,

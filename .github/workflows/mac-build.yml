@@ -1,0 +1,64 @@
+name: Mac test build
+
+# Builds, tests and bundles the Apple Silicon app for work on `mac/**` branches (or on demand)
+# and uploads the .dmg as a workflow artifact for hands-on testing. Nothing is released.
+on:
+  push:
+    branches: ["mac/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: mac-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mac:
+    name: macOS arm64 (Metal)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-arm64-ggml-v3
+          cache-directories: |
+            ~/Library/Caches/sherpa-rs
+            ~/.cache/hark
+      - name: Frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm typecheck
+          pnpm test
+      - name: Rust tests
+        run: |
+          cargo test --workspace --exclude hark --no-run
+          node scripts/stage-runtime-libs.mjs --profile debug
+          cargo test --workspace --exclude hark
+      - name: Clippy
+        run: cargo clippy --workspace --exclude hark --all-targets -- -D warnings
+      - name: Prepare sidecars and runtime libraries
+        run: node scripts/prepare-bundle.mjs --features metal
+      - name: Bundle the app
+        env:
+          HARK_VARIANT: metal
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: pnpm tauri build --features metal --bundles dmg
+      - name: Check the bundled ffmpeg has the hardware encoder
+        run: |
+          ff=$(find target/release/bundle -path '*Contents/MacOS/ffmpeg*' | head -1)
+          echo "bundled ffmpeg: $ff"
+          "$ff" -hide_banner -encoders | grep -i videotoolbox
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Debrief-mac-apple-silicon-dmg
+          path: target/release/bundle/dmg/*.dmg
+          retention-days: 14

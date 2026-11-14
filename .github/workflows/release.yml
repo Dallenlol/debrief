@@ -25,11 +25,11 @@ jobs:
             features: cuda
             suffix: cuda
           - name: macos-arm64
-            os: macos-14
+            os: macos-latest
             features: metal
             suffix: apple-silicon
           - name: macos-x64
-            os: macos-14
+            os: macos-latest
             target: x86_64-apple-darwin
             features: ""
             suffix: intel

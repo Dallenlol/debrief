@@ -55,9 +55,11 @@ jobs:
         run: pnpm tauri build --features metal --bundles dmg
       - name: Check the bundled ffmpeg has the hardware encoder
         run: |
-          ff=$(find target/release/bundle -path '*Contents/MacOS/ffmpeg*' | head -1)
-          echo "bundled ffmpeg: $ff"
+          # The sidecar prepare-bundle downloaded is the one Tauri copies into the app.
+          ff="src-tauri/binaries/ffmpeg-$(rustc -vV | sed -n 's/host: //p')"
+          ls -la "$ff"
           "$ff" -hide_banner -encoders | grep -i videotoolbox
+          ls -la target/release/bundle/dmg/
       - uses: actions/upload-artifact@v4
         with:
           name: Debrief-mac-apple-silicon-dmg

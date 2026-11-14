@@ -26,7 +26,7 @@ windows-core = "0.62"
 objc2 = "0.6"
 objc2-core-audio = { version = "0.3", default-features = false, features = ["std", "AudioHardware", "objc2", "objc2-foundation"] }
 objc2-core-foundation = "0.3"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSString", "NSValue", "NSUUID"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSEnumerator", "NSString", "NSValue", "NSUUID"] }
 libc = "0.2"
 
 [dev-dependencies]

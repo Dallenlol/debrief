@@ -1,2 +1,7 @@
 [toolchain]
-channel = "stable"
+# Pinned: newer Cargo (1.9x+ on CI runners) uses a new build-directory layout
+# (build/<crate>/<hash>/out) that breaks sherpa-rs-sys and llama-cpp-sys-2, whose build
+# scripts walk up from OUT_DIR to find target/<profile>/deps. Bump deliberately, together
+# with the workflows' `toolchain:` inputs, once those crates handle it.
+channel = "1.95.0"
+components = ["clippy"]

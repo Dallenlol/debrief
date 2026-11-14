@@ -26,7 +26,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.95.0 # keep in step with rust-toolchain.toml
       - uses: Swatinem/rust-cache@v2
         with:
           cache-directories: |

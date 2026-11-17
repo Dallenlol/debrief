@@ -6,5 +6,5 @@ export const SITE = {
   tagline: "The free, open-source meeting recorder that keeps your meetings on your computer.",
   description:
     "Debrief is an open-source, offline alternative to Fathom, Otter and Fireflies. It records Zoom, Teams and Google Meet calls locally, transcribes with speaker names, and lets you chat with a private on-device AI about any meeting. No bot, no account, local by default.",
-  version: "0.4.0",
+  version: "0.5.0",
 };

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 - 2026-11-16
 
 - **Hark is now Debrief.** New name, new mark (a level-meter bar as the spine of a D, its bowl in ember), `debrief.exe`, `.debrief` bundles (old `.hark` bundles still import). The data folder moves from `%APPDATA%\Hark` to `%APPDATA%\Debrief` on first start, custom data folders included.
 - **Screen recordings show the screen.** Window capture used GDI, which returns black frames for anything the GPU draws (browsers, Zoom, Teams, Electron) - videos were black with only the cursor. It now uses Windows Graphics Capture by window handle, falls back to the main screen when a window cannot be captured, and keeps frame sizes even so odd-sized windows encode.

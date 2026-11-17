@@ -12,6 +12,7 @@ step if you change one. Needs only Pillow.
 from __future__ import annotations
 
 import math
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -105,13 +106,19 @@ def main() -> int:
     for n in sizes:
         sheet.alpha_composite(icon.resize((n, n), Image.LANCZOS), (x, 16 + (256 - n) // 2))
         x += n + 16
-    preview = ROOT / "docs" / "img" / "icon-sizes.png"
+    preview = ROOT / "target" / "icon-sizes.png"
     preview.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(preview)
     print(f"wrote {preview.relative_to(ROOT)}")
 
     if "--tauri" in sys.argv:
         subprocess.run(["pnpm", "tauri", "icon", str(out)], cwd=ROOT, check=True, shell=sys.platform == "win32")
+        # Desktop-only app: keep just the icons tauri.conf.json bundles (plus icon.png).
+        icons = ROOT / "src-tauri" / "icons"
+        for p in [*icons.glob("Square*Logo.png"), icons / "StoreLogo.png", icons / "64x64.png"]:
+            p.unlink(missing_ok=True)
+        for d in ("ios", "android"):
+            shutil.rmtree(icons / d, ignore_errors=True)
     return 0
 
 

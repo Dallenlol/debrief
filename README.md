@@ -1,8 +1,8 @@
 <img src="assets/logo.svg" alt="Debrief logo" width="72" height="72" align="left" />
 
-# Debrief: free, open-source AI meeting recorder and transcriber
+# Debrief: free, open-source AI meeting recorder, transcriber and notetaker
 
-**Record Zoom, Microsoft Teams and Google Meet calls on your own computer. Get live captions, a speaker-labelled transcript, AI meeting notes and answers to your questions, all offline. A private, local-first alternative to Otter.ai, Fathom and Fireflies.**
+**Record Zoom, Microsoft Teams and Google Meet calls on your own computer. Get live captions, a speaker-labelled transcript, AI meeting notes and answers to your questions, all offline. A private, local-first AI notetaker and alternative to Otter.ai, Fathom and Fireflies.**
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Windows and macOS](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
@@ -86,6 +86,8 @@ See [docs/privacy.md](docs/privacy.md).
 **Does it work without internet?** Yes, completely, once the models are downloaded.
 
 **Does it work with Zoom, Teams and Google Meet?** Yes, and with any other app, because it records the app's audio rather than joining as a bot.
+
+**Does it work on a Mac?** Yes, on Apple Silicon and Intel Macs. On Apple Silicon the AI runs on the GPU through Metal.
 
 **Can it record in-person meetings?** Yes. Start a recording manually; speaker identification works from the mic alone.
 
